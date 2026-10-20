@@ -1,0 +1,92 @@
+{
+ "engines": {
+  "supertonic-3": {
+   "bytes": 200300587,
+   "files": {
+    "duration_predictor.onnx": {
+     "size": 1993709,
+     "sha256": "6f53e96d47917a28918ed0970abf393089e3bc6d7d6bf7b115342a1bdae89c36",
+     "parts": [
+      "duration_predictor.onnx.part00"
+     ]
+    },
+    "text_encoder.onnx": {
+     "size": 18474768,
+     "sha256": "cbf2c872a22b7d1d99303425c249ee1eca1198db11fe1459aec53921073159a0",
+     "parts": [
+      "text_encoder.onnx.part00"
+     ]
+    },
+    "vector_estimator.onnx": {
+     "size": 128735277,
+     "sha256": "0e3c8d92896ad6642036a5a856f4311a087f712dffcaf2e4c0f412a64aded6a4",
+     "parts": [
+      "vector_estimator.onnx.part00",
+      "vector_estimator.onnx.part01",
+      "vector_estimator.onnx.part02"
+     ]
+    },
+    "vocoder.onnx": {
+     "size": 50810904,
+     "sha256": "8ea6955582b93eb4ac5d8746549e49cb4d6b5ffaa844f8506f8d9fa0ab9a4309",
+     "parts": [
+      "vocoder.onnx.part00",
+      "vocoder.onnx.part01"
+     ]
+    },
+    "tts.json": {
+     "size": 8253,
+     "sha256": "42078d3aef1cd43ab43021f3c54f47d2d75ceb4e75f627f118890128b06a0d09",
+     "parts": [
+      "tts.json.part00"
+     ]
+    },
+    "unicode_indexer.json": {
+     "size": 277676,
+     "sha256": "9bf7346e43883a81f8645c81224f786d43c5b57f3641f6e7671a7d6c493cb24f",
+     "parts": [
+      "unicode_indexer.json.part00"
+     ]
+    }
+   },
+   "voices": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5"
+   ]
+  },
+  "kokoro-82m": {
+   "bytes": 163368721,
+   "files": {
+    "kokoro.onnx": {
+     "size": 163367190,
+     "sha256": "892c8a9ccd5d206e48a6bdce2c2354b6bc4a5d349c8222cf61de32ec344e2fc5",
+     "parts": [
+      "kokoro.onnx.part00",
+      "kokoro.onnx.part01",
+      "kokoro.onnx.part02",
+      "kokoro.onnx.part03"
+     ]
+    },
+    "config.json": {
+     "size": 1531,
+     "sha256": "c81a89e43934859192a9364ea7bfbfb8afbdbc6128cc6ae9769c691a49529c66",
+     "parts": [
+      "config.json.part00"
+     ]
+    }
+   },
+   "voices": [
+    "zf_xiaoxiao",
+    "zm_yunjian"
+   ]
+  }
+ }
+}
