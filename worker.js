@@ -196,6 +196,18 @@ async function kkSynth(k, text, style, speed) {
 }
 
 // ---- jobs -----------------------------------------------------------------------------------------
+// Kokoro pads every chunk with silence; trim it so the configured pauses alone set the rhythm.
+function trimSilence(x, sr, margin = 0.04) {
+  let peak = 0; for (const v of x) peak = Math.max(peak, Math.abs(v));
+  if (!peak) return x;
+  const th = peak * 0.02, win = Math.round(sr * 0.01);
+  const loud = (i) => { for (let j = i; j < Math.min(x.length, i + win); j++) if (Math.abs(x[j]) > th) return true; return false; };
+  let a = 0; while (a < x.length && !loud(a)) a += win;
+  let b = x.length; while (b > a && !loud(Math.max(0, b - win))) b -= win;
+  const m = Math.round(sr * margin);
+  return x.subarray(Math.max(0, a - m), Math.min(x.length, b + m));
+}
+
 async function synthesize({ engine, lang, voice, speed, steps, text, commaBreak = false, pauses = { sentence: 0.3, comma: 0.15 } }) {
   cancelled = false;
   const e = await ensureEngine(engine);
@@ -217,7 +229,7 @@ async function synthesize({ engine, lang, voice, speed, steps, text, commaBreak 
     if (cancelled) throw new Error('cancelled');
     post('progress', { done: i, total: chunks.length });
     const wav = e.kind === 'supertonic' ? await stSynth(e, chunks[i], lang, style, steps, speed) : await kkSynth(e, chunks[i], style, speed);
-    pieces.push(wav); if (i < chunks.length - 1) pieces.push(pauseFor(chunks[i]));
+    pieces.push(e.kind === 'kokoro' ? trimSilence(wav, e.sr) : wav); if (i < chunks.length - 1) pieces.push(pauseFor(chunks[i]));
   }
   const n = pieces.reduce((a, p) => a + p.length, 0);
   const audio = new Float32Array(n);

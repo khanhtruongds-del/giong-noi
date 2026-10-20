@@ -137,9 +137,9 @@ $('go').onclick = () => {
   const L = cfg.languages[lang];
   busy = true; animate(true);
   $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null); refresh();
-  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: (L.choices || {})[gender] ? $('voice').value : L[gender], speed: cfg.speed[$('speed').value] || 1,
+  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: (L.choices || {})[gender] ? $('voice').value : L[gender], speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
                        steps: cfg.quality[$('quality').value] || 8, text: content,
-                       commaBreak: (cfg.pause_at_comma || []).includes(lang), pauses: cfg.pauses });
+                       commaBreak: (cfg.pause_at_comma || []).includes(lang), pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {})[lang] || {}) } });
 };
 $('cancel').onclick = () => {
   // Terminating is the only way to stop a running ONNX call; the next job starts a fresh worker (models stay cached on disk).
