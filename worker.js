@@ -184,27 +184,28 @@ async function kkSynth(k, text, style, speed) {
 }
 
 // ---- jobs -----------------------------------------------------------------------------------------
-async function synthesize({ engine, lang, voice, speed, steps, text }) {
+async function synthesize({ engine, lang, voice, speed, steps, text, commaBreak = false, pauses = { sentence: 0.3, comma: 0.15 } }) {
   cancelled = false;
   const e = await ensureEngine(engine);
   let chunks, style;
   if (e.kind === 'supertonic') {
     const bad = stUnsupported(e, text);
     if (bad.length) throw new Error('Giọng này không đọc được các ký tự: ' + bad.join(' ') + '. Hãy xoá hoặc thay chúng rồi thử lại.');
-    chunks = sentenceChunks(text, lang === 'ko' ? 120 : 300);
+    chunks = sentenceChunks(text, lang === 'ko' ? 120 : 300, { group: false, commaBreak });
     style = await stStyle(e, voice);
   } else {
-    chunks = sentenceChunks(text, 120).flatMap(kkFit);
+    chunks = sentenceChunks(text, 120, { group: false, commaBreak }).flatMap(kkFit);
     style = await kkStyle(e, voice);
   }
   if (!chunks.length) throw new Error('Không có đoạn văn bản hợp lệ.');
-  const pause = new Float32Array(Math.round(0.25 * e.sr));
+  // A sentence gets the longer pause; a clause that was split at a comma gets the shorter one.
+  const pauseFor = (c) => new Float32Array(Math.round((/[、，,]$/.test(c.trim()) ? pauses.comma : pauses.sentence) * e.sr));
   const pieces = [];
   for (let i = 0; i < chunks.length; i++) {
     if (cancelled) throw new Error('cancelled');
     post('progress', { done: i, total: chunks.length });
     const wav = e.kind === 'supertonic' ? await stSynth(e, chunks[i], lang, style, steps, speed) : await kkSynth(e, chunks[i], style, speed);
-    pieces.push(wav); if (i < chunks.length - 1) pieces.push(pause);
+    pieces.push(wav); if (i < chunks.length - 1) pieces.push(pauseFor(chunks[i]));
   }
   const n = pieces.reduce((a, p) => a + p.length, 0);
   const audio = new Float32Array(n);

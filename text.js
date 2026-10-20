@@ -2,8 +2,9 @@
 const SENTENCE_END = '.!?。！？…\n';
 const SOFT_BREAK = ',，、;；:：';
 
-export function sentenceChunks(text, limit = 200) {
+export function sentenceChunks(text, limit = 200, { group = true, commaBreak = false } = {}) {
   text = text.normalize('NFC');
+  if (commaBreak) text = text.replace(/([、，,])\s*/g, '$1\n');
   const chars = [...text];
   const sentences = [];
   let start = 0;
@@ -27,7 +28,7 @@ export function sentenceChunks(text, limit = 200) {
   const chunks = [];
   let cur = [];
   for (const p of pieces) {
-    if (cur.length && cur.length + p.length > limit) { chunks.push(cur.join('')); cur = []; }
+    if (cur.length && (!group || cur.length + p.length > limit)) { chunks.push(cur.join('')); cur = []; }
     cur = cur.concat(p);
   }
   if (cur.length) chunks.push(cur.join(''));
