@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giấy phép và nguồn</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e3e6eb;--accent:#e5283e;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0d131c;--card:#141b26;--ink:#f1f5f9;--muted:#9aa4b2;--line:#273041;--accent:#f0384d;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 16px}h1{font-size:26px;margin:0 0 6px}h2{font-size:18px;margin:22px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:10px 0}
+a{color:var(--accent)}td,th{text-align:left;padding:6px 8px;border-top:1px solid var(--line);vertical-align:top}table{border-collapse:collapse;width:100%}
+.muted{color:var(--muted)}
+</style></head><body><main>
+<h1>Giấy phép và nguồn</h1>
+<p class="muted">Trang này chạy hoàn toàn trong trình duyệt. Văn bản bạn nhập không được gửi lên máy chủ nào.</p>
+
+<div class="card">
+<h2 style="margin-top:0">Giọng đọc là giọng tổng hợp do máy tạo</h2>
+<p>Khi dùng hoặc chia sẻ âm thanh tạo ra từ trang này (bài giảng, video, mạng xã hội…), hãy ghi rõ đó là <b>giọng do máy tạo</b>.</p>
+<p><b>Đức, Anh, Pháp, Nhật, Hàn</b> — Supertonic 3 của Supertone Inc., giấy phép <a href="LICENSES/supertonic-3-OpenRAIL-M.txt">BigScience OpenRAIL-M</a>.
+Người dùng phải tuân thủ các hạn chế sử dụng tại Attachment A, trong đó có: không dùng để vi phạm pháp luật, gây hại trẻ em, tạo thông tin sai nhằm gây hại,
+mạo danh người khác (deepfake) khi không được đồng ý, quấy rối, phân biệt đối xử, và không đăng tải nội dung do máy tạo mà không ghi rõ là do máy tạo.
+Trọng số được lưu ở dạng float16 để giảm dung lượng.</p>
+<p><b>Trung (Quan thoại)</b> — Kokoro-82M v1.0 của hexgrad, giấy phép <a href="LICENSES/kokoro-Apache-2.0.txt">Apache 2.0</a>; dự án chuyển sang ONNX và lưu float16.</p>
+</div>
+
+<h2>Thành phần phần mềm</h2>
+<div class="card"><table>
+<tr><th>Thành phần</th><th>Dùng để</th><th>Giấy phép</th></tr>
+<tr><td>ONNX Runtime Web</td><td>Chạy model trong trình duyệt</td><td><a href="LICENSES/onnxruntime.txt">MIT</a></td></tr>
+<tr><td>supertonic (mã Python, chuyển sang JavaScript)</td><td>Cách xử lý văn bản và lấy mẫu của Supertonic</td><td><a href="LICENSES/supertonic-code.txt">MIT</a></td></tr>
+<tr><td>misaki</td><td>Chữ Hán → âm vị cho Kokoro (chuyển sang JavaScript)</td><td><a href="LICENSES/misaki.txt">Apache 2.0</a></td></tr>
+<tr><td>jieba-wasm, jieba</td><td>Tách từ tiếng Trung</td><td><a href="LICENSES/jieba-wasm.txt">MIT</a>, <a href="LICENSES/jieba.txt">MIT</a></td></tr>
+<tr><td>pypinyin (từ điển + thuật toán, chuyển sang JavaScript)</td><td>Phiên âm pinyin</td><td><a href="LICENSES/pypinyin.txt">MIT</a></td></tr>
+<tr><td>cn2an (chuyển sang JavaScript)</td><td>Đọc số thành chữ Hán</td><td><a href="LICENSES/cn2an.txt">MIT</a></td></tr>
+<tr><td>coi-serviceworker</td><td>Bật chạy nhiều luồng trên trang tĩnh</td><td><a href="LICENSES/coi-serviceworker.txt">MIT</a></td></tr>
+<tr><td>Lucide</td><td>Biểu tượng</td><td><a href="LICENSES/lucide.txt">ISC</a></td></tr>
+</table></div>
+<p><a href="./">← Quay lại</a></p>
+</main></body></html>

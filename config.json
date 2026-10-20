@@ -1,0 +1,18 @@
+{
+  "_ghi_chu": "Giọng Nam/Nữ của từng tiếng. TẠM THỜI, chưa có kết quả phiếu nghe. Supertonic: M1-M5, F1-F5. Kokoro (tiếng Trung): zm_yunjian, zm_yunxi, zm_yunxia, zm_yunyang, zf_xiaobei, zf_xiaoni, zf_xiaoxiao, zf_xiaoyi.",
+  "languages": {
+    "de": {"name": "Đức", "full": "Tiếng Đức", "engine": "supertonic-3", "male": "M1", "female": "F1", "speed": 1.05,
+           "sample": "Guten Morgen! Wie geht es Ihnen heute?"},
+    "en": {"name": "Anh", "full": "Tiếng Anh", "engine": "supertonic-3", "male": "M1", "female": "F1", "speed": 1.05,
+           "sample": "Good morning! How are you today?"},
+    "fr": {"name": "Pháp", "full": "Tiếng Pháp", "engine": "supertonic-3", "male": "M1", "female": "F1", "speed": 1.05,
+           "sample": "Bonjour ! Comment allez-vous aujourd'hui ?"},
+    "zh": {"name": "Trung", "full": "Tiếng Trung (Quan thoại)", "engine": "kokoro-82m", "male": "zm_yunjian", "female": "zf_xiaoxiao", "speed": 1.0,
+           "sample": "早上好！你今天怎么样？"},
+    "ja": {"name": "Nhật", "full": "Tiếng Nhật", "engine": "supertonic-3", "male": "M1", "female": "F1", "speed": 1.05,
+           "sample": "おはようございます。今日もよろしくお願いします。"},
+    "ko": {"name": "Hàn", "full": "Tiếng Hàn", "engine": "supertonic-3", "male": "M1", "female": "F1", "speed": 1.05,
+           "sample": "안녕하세요. 만나서 반갑습니다."}
+  },
+  "quality": {"Nhanh": 5, "Cân bằng": 8, "Chất lượng cao": 16}
+}
