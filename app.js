@@ -43,6 +43,9 @@ document.querySelectorAll('#genders .pill').forEach(b => (b.onclick = () => { ge
 for (const q of Object.keys(cfg.quality)) $('quality').append(new Option(q, q));
 $('quality').value = cfg.quality[store.get('quality')] ? store.get('quality') : 'Cân bằng';
 $('quality').onchange = () => store.set('quality', $('quality').value);
+for (const sp of Object.keys(cfg.speed)) $('speed').append(new Option(sp, sp));
+$('speed').value = cfg.speed[store.get('speed')] ? store.get('speed') : cfg.default_speed;
+$('speed').onchange = () => store.set('speed', $('speed').value);
 
 const mb = (b) => (b / 1e6).toFixed(0) + ' MB';
 function refresh() {
@@ -96,7 +99,7 @@ const handlers = {
   status: (d) => setStatus(d.message),
   download: (d) => { setStatus(`Đang tải dữ liệu giọng (chỉ lần đầu)… ${mb(d.got)} / ${mb(d.total)}`); progress(d.got / d.total); },
   progress: (d) => { setStatus(`Đang đọc đoạn ${d.done + 1}/${d.total}…`); progress(d.done / d.total); },
-  done: (d) => { progress(1); setStatus('Xong.'); showResult(d.audio, d.sampleRate); finish(); worker.postMessage({ type: 'status' }); },
+  done: (d) => { bar.hidden = true; setStatus('Xong.'); showResult(d.audio, d.sampleRate); finish(); worker.postMessage({ type: 'status' }); },
   error: (d) => { finish(); bar.hidden = true; setStatus(d.message, true); },
   cancelled: () => { finish(); bar.hidden = true; setStatus('Đã hủy.'); },
   cache: (d) => { cache = d.engines; refresh(); renderData(); },
@@ -110,7 +113,7 @@ $('go').onclick = () => {
   const L = cfg.languages[lang];
   busy = true; refresh(); $('cancel').disabled = false; animate(true);
   $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null);
-  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: L[gender], speed: L.speed,
+  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: L[gender], speed: cfg.speed[$('speed').value] || 1,
                        steps: cfg.quality[$('quality').value] || 8, text: content });
 };
 $('cancel').onclick = () => {

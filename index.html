@@ -44,6 +44,7 @@ h1 { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; letter-spa
 .settings > div:first-child { padding-left: 0; }
 .settings > div + div { border-left: 1px solid var(--line); }
 .settings > div:last-child { padding-right: 0; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pills { display: flex; gap: 8px; flex-wrap: wrap; }
 button { font: inherit; cursor: pointer; }
 .pill { height: 36px; min-width: 72px; padding: 0 16px; border-radius: 18px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; }
@@ -154,9 +155,15 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
           <button class="pill" data-g="male">Nam</button><button class="pill" data-g="female">Nữ</button>
         </div>
       </div>
-      <div>
-        <div class="cap ink"><svg class="i"><use href="#i-gear"/></svg>CHẤT LƯỢNG</div>
-        <select id="quality" aria-label="Chất lượng"></select>
+      <div class="two">
+        <div>
+          <div class="cap ink"><svg class="i"><use href="#i-gear"/></svg>TỐC ĐỘ</div>
+          <select id="speed" aria-label="Tốc độ đọc"></select>
+        </div>
+        <div>
+          <div class="cap ink"><svg class="i"><use href="#i-gear"/></svg>CHẤT LƯỢNG</div>
+          <select id="quality" aria-label="Chất lượng"></select>
+        </div>
       </div>
     </div>
     <div class="hint" id="hint"><span class="dot">!</span><span id="hintText"></span></div>
