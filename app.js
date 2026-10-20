@@ -1,7 +1,7 @@
 // UI: settings, text, job control, WAV export. Heavy work happens in worker.js.
 const $ = (id) => document.getElementById(id);
-const cfg = await (await fetch('config.json')).json();
-const manifest = await (await fetch('models/manifest.json')).json();
+const cfg = await (await fetch('config.json', { cache: 'no-cache' })).json();
+const manifest = await (await fetch('models/manifest.json', { cache: 'no-cache' })).json();
 const ORDER = ['de', 'en', 'fr', 'zh', 'ja', 'ko'];
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
