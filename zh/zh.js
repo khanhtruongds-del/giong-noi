@@ -97,7 +97,7 @@ function lazyPinyin(word) {
 }
 
 // ---- misaki ZHG2P(version=None) ------------------------------------------------------------------
-function mapPunctuation(t) {
+export function mapPunctuation(t) {
   return t.replaceAll('、', ', ').replaceAll('，', ', ').replaceAll('。', '. ').replaceAll('．', '. ').replaceAll('！', '! ')
     .replaceAll('：', ': ').replaceAll('；', '; ').replaceAll('？', '? ').replaceAll('«', ' “').replaceAll('»', '” ')
     .replaceAll('《', ' “').replaceAll('》', '” ').replaceAll('「', ' “').replaceAll('」', '” ').replaceAll('【', ' “')

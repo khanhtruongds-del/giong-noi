@@ -53,9 +53,19 @@ function refresh() {
   document.querySelectorAll('#genders .pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === gender));
   const L = cfg.languages[lang];
   // Kokoro (Chinese) has no quality steps: hide the control instead of showing a dead dropdown.
-  const kokoro = L.engine === 'kokoro-82m';
+  const kokoro = L.engine.startsWith('kokoro');
   $('qualityBox').hidden = kokoro;
-  $('opts').classList.toggle('one', kokoro);
+  // Languages with a "choices" list (Chinese, while teachers pick) let the user try every voice of that gender.
+  const pool = (L.choices || {})[gender];
+  $('voiceBox').hidden = !pool;
+  if (pool) {
+    const sel = $('voice'), saved = store.get(`voice_${lang}_${gender}`);
+    sel.textContent = '';
+    pool.forEach((id, i) => sel.append(new Option(`${gender === 'male' ? 'Nam' : 'Nữ'} ${id.slice(3)}${id === L[gender] ? ' (mặc định)' : ''}`, id)));
+    sel.value = pool.includes(saved) ? saved : L[gender];
+    sel.onchange = () => store.set(`voice_${lang}_${gender}`, sel.value);
+  }
+  $('opts').classList.toggle('one', kokoro && !pool);
   const st = cache[L.engine];
   const hint = $('hint');
   const who = `${L.full} · giọng ${gender === 'male' ? 'nam' : 'nữ'}`;
@@ -127,7 +137,7 @@ $('go').onclick = () => {
   const L = cfg.languages[lang];
   busy = true; animate(true);
   $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null); refresh();
-  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: L[gender], speed: cfg.speed[$('speed').value] || 1,
+  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: (L.choices || {})[gender] ? $('voice').value : L[gender], speed: cfg.speed[$('speed').value] || 1,
                        steps: cfg.quality[$('quality').value] || 8, text: content,
                        commaBreak: (cfg.pause_at_comma || []).includes(lang), pauses: cfg.pauses });
 };
@@ -148,7 +158,8 @@ function wav(samples, sr) {
 }
 function filename() {
   const words = (text.value.match(/[\p{L}\p{N}]+/gu) || []).slice(0, 5).join('-').slice(0, 40) || 'giong-noi';
-  return `${lang}_${gender === 'male' ? 'nam' : 'nu'}_${words}.wav`;
+  const L = cfg.languages[lang], who = (L.choices || {})[gender] ? $('voice').value : (gender === 'male' ? 'nam' : 'nu');
+  return `${lang}_${who}_${words}.wav`;
 }
 function showResult(samples, sr) {
   const blob = wav(samples, sr);
@@ -165,7 +176,7 @@ $('player').onplay = () => ($('playLabel').textContent = 'Dừng');
 $('player').onpause = $('player').onended = () => ($('playLabel').textContent = 'Nghe');
 
 // ---- data dialog -----------------------------------------------------------------------------
-const NAMES = { 'supertonic-3': 'Đức · Anh · Pháp · Nhật · Hàn (Supertonic 3)', 'kokoro-82m': 'Trung (Kokoro-82M)' };
+const NAMES = { 'supertonic-3': 'Đức · Anh · Pháp · Nhật · Hàn (Supertonic 3)', 'kokoro-82m': 'Trung (Kokoro-82M)', 'kokoro-zh': 'Trung (Kokoro-82M v1.1-zh)' };
 function renderData() {
   const list = $('engList'); list.textContent = '';
   for (const [name, e] of Object.entries(manifest.engines)) {

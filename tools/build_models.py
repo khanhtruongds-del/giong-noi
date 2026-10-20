@@ -33,6 +33,7 @@ def main():
     p.add_argument('--supertonic', type=Path, required=True)
     p.add_argument('--kokoro', type=Path, required=True)
     p.add_argument('--kokoro-voices', default='zf_,zm_', help='tiền tố giọng Kokoro cần đưa lên (mặc định: tiếng Trung)')
+    p.add_argument('--kokoro-name', default='kokoro-zh', help='tên thư mục/engine cho Kokoro trong models/')
     p.add_argument('--out', type=Path, default=Path('models'))
     p.add_argument('--part-mb', type=int, default=45)
     a = p.parse_args()
@@ -47,7 +48,7 @@ def main():
         shutil.copy2(v, st / 'voice_styles' / v.name)
     manifest['engines']['supertonic-3'] = dict(bytes=sum(f['size'] for f in files.values()), files=files,
                                                voices=sorted(v.stem for v in (a.supertonic / 'voice_styles').glob('*.json')))
-    kk = a.out / 'kokoro-82m'
+    kk = a.out / a.kokoro_name
     (kk / 'voices').mkdir(parents=True)
     files = {f: split(a.kokoro / f, kk, f, part) for f in ('kokoro.onnx', 'config.json')}
     voices = []
@@ -58,7 +59,7 @@ def main():
             assert arr.shape == (510, 256), arr.shape
             (kk / 'voices' / f'{v.stem}.bin').write_bytes(arr.tobytes())
             voices.append(v.stem)
-    manifest['engines']['kokoro-82m'] = dict(bytes=sum(f['size'] for f in files.values()), files=files, voices=voices)
+    manifest['engines'][a.kokoro_name] = dict(bytes=sum(f['size'] for f in files.values()), files=files, voices=voices)
     (a.out / 'manifest.json').write_text(json.dumps(manifest, indent=1) + '\n', encoding='utf-8')
     for name, e in manifest['engines'].items():
         print(name, round(e['bytes'] / 1e6, 1), 'MB', sum(len(f['parts']) for f in e['files'].values()), 'parts', len(e['voices']), 'voices')

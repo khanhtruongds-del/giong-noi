@@ -1,7 +1,7 @@
-// Inference worker: Supertonic 3 (en, fr, de, ja, ko) and Kokoro-82M (zh) with ONNX Runtime Web.
+// Inference worker: Supertonic 3 (en, fr, de, ja, ko) and Kokoro-82M-v1.1-zh (zh) with ONNX Runtime Web.
 // Everything runs on the user's machine; model files are fetched once and kept in the Cache API.
 import * as ort from './vendor/ort.wasm.min.mjs';
-import { loadZh, g2pZh } from './zh/zh.js';
+import { loadZh11, g2pZh11 } from './zh/zh11.js';
 import { sentenceChunks } from './text.js';
 
 const BASE = new URL('./', import.meta.url).href;
@@ -16,8 +16,20 @@ let cancelled = false;
 const post = (type, data = {}) => self.postMessage({ type, ...data });
 
 async function getManifest() {
-  if (!manifest) manifest = await (await fetch(BASE + 'models/manifest.json', { cache: 'no-cache' })).json();
+  if (!manifest) {
+    manifest = await (await fetch(BASE + 'models/manifest.json', { cache: 'no-cache' })).json();
+    pruneCache(manifest).catch(() => {});
+  }
   return manifest;
+}
+
+// Drop cached parts of engines that are no longer published (e.g. the old Chinese model).
+async function pruneCache(m) {
+  const keep = new Set();
+  for (const [name, e] of Object.entries(m.engines))
+    for (const f of Object.values(e.files)) for (const part of f.parts) keep.add(BASE + 'models/' + name + '/' + part);
+  const cache = await caches.open(CACHE);
+  for (const req of await cache.keys()) if (!keep.has(req.url)) await cache.delete(req);
 }
 
 // ---- download with cache + progress ---------------------------------------------------------------
@@ -70,7 +82,7 @@ async function ensureEngine(name) {
   post('status', { message: st.complete ? 'Đang nạp giọng…' : 'Đang tải dữ liệu giọng lần đầu…' });
   const files = await loadFiles(name, (n) => { got += n; post('download', { engine: name, got, total }); });
   post('status', { message: 'Đang nạp giọng…' });
-  engines[name] = name === 'supertonic-3' ? await makeSupertonic(files) : await makeKokoro(files);
+  engines[name] = name === 'supertonic-3' ? await makeSupertonic(files) : await makeKokoro(files, name);
   return engines[name];
 }
 
@@ -152,26 +164,26 @@ async function stSynth(s, text, lang, style, steps, speed) {
   return wav.slice(0, Math.min(wav.length, wavLen));
 }
 
-// ---- Kokoro-82M (ONNX exported by the project; G2P = misaki zh port) ------------------------------
-async function makeKokoro(files) {
+// ---- Kokoro-82M-v1.1-zh (ONNX exported by the project; G2P = misaki ZHG2P v1.1 port) -------------
+async function makeKokoro(files, name) {
   const cfg = JSON.parse(new TextDecoder().decode(files['config.json']));
-  await loadZh(BASE + 'zh/');
-  return { kind: 'kokoro', sr: cfg.sample_rate || 24000, vocab: cfg.vocab, styles: {}, sess: await session(files['kokoro.onnx']) };
+  await loadZh11(BASE + 'zh/');
+  return { kind: 'kokoro', name, sr: cfg.sample_rate || 24000, vocab: cfg.vocab, styles: {}, sess: await session(files['kokoro.onnx']) };
 }
 
 async function kkStyle(k, id) {
-  if (!k.styles[id]) k.styles[id] = new Float32Array(await (await fetch(BASE + 'models/kokoro-82m/voices/' + id + '.bin')).arrayBuffer());
+  if (!k.styles[id]) k.styles[id] = new Float32Array(await (await fetch(BASE + 'models/' + k.name + '/voices/' + id + '.bin')).arrayBuffer());
   return k.styles[id];
 }
 
 function kkFit(chunk) {   // keep the phoneme string within Kokoro's 510-symbol context
-  if (g2pZh(chunk).length <= 510 || chunk.length < 8) return [chunk];
+  if (g2pZh11(chunk).length <= 510 || chunk.length < 8) return [chunk];
   const half = sentenceChunks(chunk, Math.max(4, chunk.length >> 1));
   return half.length > 1 ? half.flatMap(kkFit) : [chunk];
 }
 
 async function kkSynth(k, text, style, speed) {
-  const ps = g2pZh(text).slice(0, 510);
+  const ps = g2pZh11(text).slice(0, 510);
   const ids = [...ps].map(c => k.vocab[c]).filter(v => v !== undefined);
   if (!ids.length) return new Float32Array(0);
   const row = Math.min(ps.length, 510) - 1;
