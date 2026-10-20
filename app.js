@@ -18,7 +18,7 @@ const bars = [];
 function buildWave() {
   const mk = (i, strong) => { const s = document.createElement('span'); if (strong) s.className = 's'; s.style.height = BARS[i] * 52 + 'px'; bars.push([s, BARS[i]]); return s; };
   BARS.forEach((_, i) => wave.append(mk(i, i >= 4)));
-  const mic = document.createElement('div'); mic.className = 'mic'; mic.innerHTML = '<svg class="i"><use href="#mic"/></svg>';
+  const mic = document.createElement('div'); mic.className = 'mic'; mic.innerHTML = '<svg class="i"><use href="#i-mic"/></svg>';
   wave.append(mic);
   [...BARS.keys()].reverse().forEach(i => wave.append(mk(i, i >= 4)));
 }
@@ -137,14 +137,14 @@ function showResult(samples, sr) {
   if (lastUrl) URL.revokeObjectURL(lastUrl);
   lastUrl = URL.createObjectURL(blob);
   const secs = Math.round(samples.length / sr);
-  $('audio').src = lastUrl; $('save').href = lastUrl; $('save').download = filename();
+  $('player').src = lastUrl; $('save').href = lastUrl; $('save').download = filename();
   $('rname').textContent = filename();
   $('rmeta').textContent = `WAV · ${(blob.size / 1e6).toFixed(1)} MB · ${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
   $('result').classList.add('show'); $('playLabel').textContent = 'Nghe';
 }
-$('play').onclick = () => { const a = $('audio'); if (a.paused) { a.currentTime = a.ended ? 0 : a.currentTime; a.play(); } else a.pause(); };
-$('audio').onplay = () => ($('playLabel').textContent = 'Dừng');
-$('audio').onpause = $('audio').onended = () => ($('playLabel').textContent = 'Nghe');
+$('play').onclick = () => { const a = $('player'); if (a.paused) { a.currentTime = a.ended ? 0 : a.currentTime; a.play(); } else a.pause(); };
+$('player').onplay = () => ($('playLabel').textContent = 'Dừng');
+$('player').onpause = $('player').onended = () => ($('playLabel').textContent = 'Nghe');
 
 // ---- data dialog -----------------------------------------------------------------------------
 const NAMES = { 'supertonic-3': 'Đức · Anh · Pháp · Nhật · Hàn (Supertonic 3)', 'kokoro-82m': 'Trung (Kokoro-82M)' };
