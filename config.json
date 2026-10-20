@@ -1,5 +1,5 @@
 {
-  "_ghi_chu": "Giọng Nam/Nữ của từng tiếng, chốt theo phiếu nghe 20/10/2026 (reports/listening/TONG_HOP.md). Supertonic: M1-M5, F1-F5. Tiếng Trung: Kokoro-82M-v1.1-zh, chốt zm_010 / zf_028 theo phiếu nghe 2 GV tiếng Trung 20/10/2026 (reports/listening/zh11/).",
+  "_ghi_chu": "Giọng Nam/Nữ của từng tiếng, chốt theo phiếu nghe 20/10/2026 (reports/listening/TONG_HOP.md). Supertonic: M1-M5, F1-F5. Tiếng Trung: Kokoro-82M-v1.1-zh, chốt zm_025 / zf_047 theo phiếu nghe 2 GV tiếng Trung 20/10/2026 (reports/listening/zh11/).",
   "languages": {
     "de": {
       "name": "Đức",
@@ -29,8 +29,8 @@
       "name": "Trung",
       "full": "Tiếng Trung (Quan thoại)",
       "engine": "kokoro-zh",
-      "male": "zm_010",
-      "female": "zf_028",
+      "male": "zm_025",
+      "female": "zf_047",
       "sample": "早上好！你今天怎么样？"
     },
     "ja": {
