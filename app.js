@@ -52,35 +52,48 @@ function refresh() {
   document.querySelectorAll('#langs .pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
   document.querySelectorAll('#genders .pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === gender));
   const L = cfg.languages[lang];
-  $('quality').disabled = L.engine === 'kokoro-82m';
-  $('quality').title = L.engine === 'kokoro-82m' ? 'Giọng tiếng Trung không có tuỳ chọn chất lượng' : '';
+  // Kokoro (Chinese) has no quality steps: hide the control instead of showing a dead dropdown.
+  const kokoro = L.engine === 'kokoro-82m';
+  $('qualityBox').hidden = kokoro;
+  $('opts').classList.toggle('one', kokoro);
   const st = cache[L.engine];
   const hint = $('hint');
+  const who = `${L.full} · giọng ${gender === 'male' ? 'nam' : 'nữ'}`;
   if (st && st.complete) {
     hint.className = 'hint ok';
-    $('hintText').textContent = `Giọng ${gender === 'male' ? 'nam' : 'nữ'} · ${L.full} · sẵn sàng, dùng được khi không có mạng`;
+    $('hintIcon').innerHTML = '<use href="#i-check"/>';
+    $('hintText').textContent = `${who} đã sẵn sàng, dùng được cả khi không có mạng.`;
   } else {
     hint.className = 'hint';
-    $('hintText').textContent = `Lần đầu dùng ${L.full}: trình duyệt sẽ tải khoảng ${mb(manifest.engines[L.engine].bytes)} dữ liệu giọng rồi giữ lại trên máy.`;
+    $('hintIcon').innerHTML = '<use href="#i-download"/>';
+    const shared = kokoro ? '' : ' (dùng chung cho Đức, Anh, Pháp, Nhật, Hàn)';
+    $('hintText').textContent = `Lần đầu dùng ${L.full}, trang sẽ tải khoảng ${mb(manifest.engines[L.engine].bytes)} dữ liệu giọng${shared}. Chỉ tải một lần, sau đó dùng được cả khi không có mạng.`;
   }
   if (placeholder) setPlaceholder();
   $('go').disabled = busy;
+  $('goLabel').textContent = busy ? 'Đang tạo…' : 'Tạo giọng đọc';
+  $('cancel').hidden = !busy;
+  if (!busy && !$('status').textContent) idle();
 }
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+function idle() { setStatus('Nhập văn bản rồi bấm “Tạo giọng đọc”.'); }
+$('kbd').innerHTML = `Mẹo: <kbd>${MAC ? '⌘' : 'Ctrl'}</kbd> + <kbd>Enter</kbd> để tạo nhanh`;
 
 // ---- text --------------------------------------------------------------------------------------
 const text = $('text');
 function setPlaceholder() { text.value = ''; text.placeholder = `Nhập hoặc dán văn bản vào đây, ví dụ:\n${cfg.languages[lang].sample}`; placeholder = true; count(); }
-function count() { const n = text.value.length; $('count').textContent = n ? n.toLocaleString('vi-VN') + ' ký tự' : ''; }
+function count() { const n = text.value.length; $('count').textContent = n ? `${n.toLocaleString('vi-VN')} / 100.000 ký tự` : ''; }
 text.addEventListener('input', () => { placeholder = !text.value; count(); });
+text.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!busy) $('go').click(); } });
 $('clear').onclick = () => { text.value = ''; setPlaceholder(); text.focus(); };
 $('open').onclick = () => $('file').click();
 $('file').onchange = async () => {
   const f = $('file').files[0]; $('file').value = '';
   if (!f) return;
-  if (f.size > 1_000_000) return setStatus('File quá lớn. Chọn file dưới 1 MB.', true);
+  if (f.size > 1_000_000) return setStatus('Tệp lớn hơn 1 MB. Hãy chọn tệp nhỏ hơn.', true);
   const t = (await f.text()).replace(/^﻿/, '');
-  if (t.length > 100_000) return setStatus('Mỗi lần tối đa 100.000 ký tự.', true);
-  if (text.value.trim() && !confirm('Thay nội dung đang nhập bằng nội dung file?')) return;
+  if (t.length > 100_000) return setStatus('Văn bản dài hơn 100.000 ký tự. Hãy chia thành nhiều lần.', true);
+  if (text.value.trim() && !confirm('Thay văn bản đang có bằng nội dung tệp?')) return;
   text.value = t; placeholder = !t; count();
 };
 
@@ -92,33 +105,34 @@ function progress(frac) { bar.hidden = false; bar.classList.toggle('indet', frac
 function newWorker() {
   worker = new Worker(new URL('worker.js', import.meta.url), { type: 'module' });
   worker.onmessage = ({ data }) => handlers[data.type]?.(data);
-  worker.onerror = (e) => { finish(); setStatus('Lỗi khi nạp phần đọc giọng: ' + (e.message || 'không rõ'), true); };
+  worker.onerror = (e) => { finish(); bar.hidden = true; setStatus('Không chạy được phần đọc giọng trên trình duyệt này. Hãy thử Chrome, Edge hoặc Safari bản mới. (' + (e.message || 'không rõ lỗi') + ')', true); };
   worker.postMessage({ type: 'status' });
 }
 const handlers = {
   status: (d) => setStatus(d.message),
-  download: (d) => { setStatus(`Đang tải dữ liệu giọng (chỉ lần đầu)… ${mb(d.got)} / ${mb(d.total)}`); progress(d.got / d.total); },
-  progress: (d) => { setStatus(`Đang đọc đoạn ${d.done + 1}/${d.total}…`); progress(d.done / d.total); },
-  done: (d) => { bar.hidden = true; setStatus('Xong.'); showResult(d.audio, d.sampleRate); finish(); worker.postMessage({ type: 'status' }); },
+  download: (d) => { setStatus(`Đang tải dữ liệu giọng lần đầu · ${mb(d.got)} / ${mb(d.total)} (${Math.round(100 * d.got / d.total)}%)`); progress(d.got / d.total); },
+  progress: (d) => { setStatus(d.total > 1 ? `Đang tạo giọng đọc… đoạn ${d.done + 1}/${d.total}` : 'Đang tạo giọng đọc…'); progress(d.total > 1 ? d.done / d.total : null); },
+  done: (d) => { bar.hidden = true; showResult(d.audio, d.sampleRate); setStatus(`Đã xong · ${clock(d.audio.length / d.sampleRate)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); worker.postMessage({ type: 'status' }); },
   error: (d) => { finish(); bar.hidden = true; setStatus(d.message, true); },
-  cancelled: () => { finish(); bar.hidden = true; setStatus('Đã hủy.'); },
+  cancelled: () => { finish(); bar.hidden = true; setStatus('Đã huỷ.'); },
   cache: (d) => { cache = d.engines; refresh(); renderData(); },
-  cleared: () => { $('dataMsg').textContent = 'Đã xoá.'; worker.postMessage({ type: 'status' }); },
+  cleared: () => { $('dataMsg').textContent = 'Đã xoá dữ liệu giọng.'; worker.postMessage({ type: 'status' }); },
 };
-function finish() { busy = false; $('cancel').disabled = true; animate(false); refresh(); }
+function finish() { busy = false; animate(false); refresh(); }
+const clock = (secs) => { secs = Math.round(secs); return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`; };
 
 $('go').onclick = () => {
   const content = text.value.trim();
-  if (!content) { setStatus('Nhập hoặc mở file văn bản trước.', true); text.focus(); return; }
+  if (!content) { setStatus('Chưa có văn bản để đọc. Hãy nhập, dán hoặc mở tệp .txt.', true); text.focus(); return; }
   const L = cfg.languages[lang];
-  busy = true; refresh(); $('cancel').disabled = false; animate(true);
-  $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null);
+  busy = true; animate(true);
+  $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null); refresh();
   worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: L[gender], speed: cfg.speed[$('speed').value] || 1,
                        steps: cfg.quality[$('quality').value] || 8, text: content });
 };
 $('cancel').onclick = () => {
   // Terminating is the only way to stop a running ONNX call; the next job starts a fresh worker (models stay cached on disk).
-  worker.terminate(); newWorker(); finish(); bar.hidden = true; setStatus('Đã hủy.');
+  worker.terminate(); newWorker(); finish(); bar.hidden = true; setStatus('Đã huỷ.');
 };
 
 // ---- result / WAV ----------------------------------------------------------------------------
@@ -142,7 +156,7 @@ function showResult(samples, sr) {
   const secs = Math.round(samples.length / sr);
   $('player').src = lastUrl; $('save').href = lastUrl; $('save').download = filename();
   $('rname').textContent = filename();
-  $('rmeta').textContent = `WAV · ${(blob.size / 1e6).toFixed(1)} MB · ${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
+  $('rmeta').textContent = `WAV · ${(blob.size / 1e6).toFixed(1)} MB · ${clock(secs)}`;
   $('result').classList.add('show'); $('playLabel').textContent = 'Nghe';
 }
 $('play').onclick = () => { const a = $('player'); if (a.paused) { a.currentTime = a.ended ? 0 : a.currentTime; a.play(); } else a.pause(); };
@@ -160,16 +174,16 @@ function renderData() {
     row.querySelector('b').textContent = NAMES[name] || name;
     row.querySelector('.sub').textContent = mb(e.bytes);
     const chip = row.querySelector('.chip');
-    chip.textContent = st.complete ? 'Đã tải' : st.parts ? `Đã tải ${st.parts}/${st.total} phần` : 'Chưa tải';
+    chip.textContent = st.complete ? 'Đã lưu trên máy' : st.parts ? `Tải dở (${st.parts}/${st.total} phần)` : 'Chưa tải';
     if (st.complete) chip.classList.add('ok');
     list.append(row);
   }
 }
 $('data').onclick = () => { $('dataMsg').textContent = ''; renderData(); $('dataDlg').showModal(); };
 $('closeDlg').onclick = () => $('dataDlg').close();
-$('wipe').onclick = () => { if (confirm('Xoá dữ liệu giọng đã tải? Lần sau dùng sẽ phải tải lại.')) worker.postMessage({ type: 'clear' }); };
+$('wipe').onclick = () => { if (confirm('Xoá dữ liệu giọng đã lưu trên máy này? Lần dùng sau sẽ phải tải lại.')) worker.postMessage({ type: 'clear' }); };
 
 newWorker();
 setPlaceholder();
 refresh();
-setStatus('');
+idle();

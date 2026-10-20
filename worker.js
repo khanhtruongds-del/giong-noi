@@ -25,7 +25,7 @@ async function fetchPart(cache, url) {
   let res = await cache.match(url);
   if (!res) {
     res = await fetch(url);
-    if (!res.ok) throw new Error(`Không tải được ${url} (${res.status})`);
+    if (!res.ok) throw new Error(`Không tải được dữ liệu giọng (lỗi ${res.status}). Kiểm tra kết nối mạng rồi thử lại.`);
     await cache.put(url, res.clone());
   }
   return res;
@@ -67,7 +67,7 @@ async function ensureEngine(name) {
   const total = m.engines[name].bytes;
   let got = 0;
   const st = await cachedBytes(name);
-  post('status', { message: st.complete ? 'Đang nạp giọng…' : 'Đang tải dữ liệu giọng (chỉ lần đầu)…' });
+  post('status', { message: st.complete ? 'Đang nạp giọng…' : 'Đang tải dữ liệu giọng lần đầu…' });
   const files = await loadFiles(name, (n) => { got += n; post('download', { engine: name, got, total }); });
   post('status', { message: 'Đang nạp giọng…' });
   engines[name] = name === 'supertonic-3' ? await makeSupertonic(files) : await makeKokoro(files);
@@ -190,7 +190,7 @@ async function synthesize({ engine, lang, voice, speed, steps, text }) {
   let chunks, style;
   if (e.kind === 'supertonic') {
     const bad = stUnsupported(e, text);
-    if (bad.length) throw new Error('Giọng này không đọc được ký tự: ' + bad.join(' '));
+    if (bad.length) throw new Error('Giọng này không đọc được các ký tự: ' + bad.join(' ') + '. Hãy xoá hoặc thay chúng rồi thử lại.');
     chunks = sentenceChunks(text, lang === 'ko' ? 120 : 300);
     style = await stStyle(e, voice);
   } else {

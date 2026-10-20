@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Giọng nói offline</title>
+<title>Đọc văn bản thành giọng nói</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23e5283e%22 stroke-width=%222%22 stroke-linecap=%22round%22%3E%3Cpath d=%22M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z%22/%3E%3Cpath d=%22M19 10v2a7 7 0 0 1-14 0v-2%22/%3E%3Cline x1=%2212%22 x2=%2212%22 y1=%2219%22 y2=%2222%22/%3E%3C/svg%3E">
 <meta name="description" content="Đọc văn bản thành giọng nói ngay trong trình duyệt, không gửi văn bản lên máy chủ.">
 <script src="coi-serviceworker.min.js"></script>
 <style>
@@ -44,27 +45,30 @@ h1 { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; letter-spa
 .settings > div:first-child { padding-left: 0; }
 .settings > div + div { border-left: 1px solid var(--line); }
 .settings > div:last-child { padding-right: 0; }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.two.one { grid-template-columns: minmax(0, 1fr); }
+.two [hidden] { display: none; }
 .pills { display: flex; gap: 8px; flex-wrap: wrap; }
 button { font: inherit; cursor: pointer; }
 .pill { height: 36px; min-width: 72px; padding: 0 16px; border-radius: 18px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; }
 .pill:hover { background: var(--field); }
 .pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 select { width: 100%; height: 38px; border-radius: 12px; border: 0; background: var(--field); color: var(--ink); font: inherit; font-weight: 700; padding: 0 12px; }
-.hint { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 14px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 14px; }
-.hint.ok { background: transparent; color: var(--muted); padding: 0 2px; margin-top: 10px; }
-.hint .dot { width: 20px; height: 20px; border-radius: 50%; background: var(--warn); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; flex: none; }
-.hint.ok .dot { display: none; }
+.hint { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 14px; border-radius: 12px; background: var(--field); color: var(--ink); font-size: 14px; }
+.hint svg { color: var(--accent); }
+.hint.ok { background: transparent; color: var(--muted); padding: 0 2px; margin-top: 12px; }
+.hint.ok svg { color: var(--good); }
 .row { display: flex; align-items: center; gap: 10px; }
 .row .grow { flex: 1; }
-.btn { height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+.btn { white-space: nowrap; height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
 .btn:hover { background: var(--field); }
 .btn svg { width: 17px; height: 17px; }
 .btn.soft { border-color: var(--accent); background: var(--soft); color: var(--accent); height: 42px; border-radius: 12px; font-size: 14px; }
 .btn.soft:hover { background: var(--soft-btn); }
 textarea { width: 100%; min-height: 160px; resize: vertical; margin-top: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); padding: 12px 14px; font-family: inherit; font-size: 17px; line-height: 1.5; }
 textarea:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.count { text-align: right; color: var(--muted); font-size: 12px; margin-top: 4px; min-height: 18px; }
+.count { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 18px; }
+kbd { font: inherit; font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; }
 .run { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 16px; align-items: center; }
 #status { font-weight: 700; font-size: 16px; min-height: 22px; }
 #status.warn { color: var(--warn); }
@@ -72,6 +76,7 @@ textarea:focus, select:focus, button:focus-visible { outline: 2px solid var(--ac
 .bar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 4px; transition: width .2s; }
 .bar.indet > i { width: 30%; animation: slide 1.1s infinite ease-in-out; }
 @keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+#cancel[hidden] { display: none; }
 #cancel { height: 44px; width: 100px; justify-content: center; font-size: 15px; font-weight: 500; grid-row: 1 / span 2; grid-column: 2; }
 #go { height: 44px; min-width: 196px; padding: 0 20px; border-radius: 12px; border: 0; background: var(--accent); color: #fff; font-weight: 800; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; grid-row: 1 / span 2; grid-column: 3; }
 #go:hover { background: var(--accent-hover); }
@@ -110,10 +115,17 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   .wrap { padding: 14px 16px; }
   header { flex-wrap: wrap; } .mic { display: none; }
   h1 { font-size: 24px; }
-  .run { grid-template-columns: 1fr 1fr; }
+  .run { grid-template-columns: 1fr auto; }
   #status, .bar { grid-column: 1 / -1; }
-  #cancel, #go { grid-row: auto; grid-column: auto; min-width: 0; width: 100%; }
+  #go { grid-row: auto; grid-column: 1 / -1; min-width: 0; width: 100%; }
+  #cancel:not([hidden]) ~ #go { grid-column: 1; }
+  #cancel { grid-row: auto; grid-column: 2; order: 2; }
   .result { flex-wrap: wrap; }
+  .result .btn { margin-left: auto; }
+  #kbd { display: none; }
+  .cap { white-space: nowrap; }
+  .row .btn { padding: 0 10px; }
+  footer { align-items: flex-start; flex-wrap: wrap; }
 }
 </style>
 </head>
@@ -130,14 +142,15 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
 </svg>
 
 <div class="wrap">
   <header>
     <div class="t">
-      <h1>Giọng nói offline</h1>
-      <div class="sub">Đọc văn bản thành giọng nói ngay trên máy · văn bản không gửi đi đâu</div>
+      <h1>Đọc văn bản thành giọng nói</h1>
+      <div class="sub">6 thứ tiếng · chạy ngay trên máy bạn · văn bản không gửi đi đâu</div>
     </div>
     <div class="wave" id="wave" aria-hidden="true"></div>
     <button class="btn soft" id="data"><svg class="i"><use href="#i-download"/></svg>Dữ liệu giọng</button>
@@ -155,57 +168,57 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
           <button class="pill" data-g="male">Nam</button><button class="pill" data-g="female">Nữ</button>
         </div>
       </div>
-      <div class="two">
+      <div class="two" id="opts">
         <div>
           <div class="cap ink"><svg class="i"><use href="#i-gear"/></svg>TỐC ĐỘ</div>
           <select id="speed" aria-label="Tốc độ đọc"></select>
         </div>
-        <div>
+        <div id="qualityBox">
           <div class="cap ink"><svg class="i"><use href="#i-gear"/></svg>CHẤT LƯỢNG</div>
           <select id="quality" aria-label="Chất lượng"></select>
         </div>
       </div>
     </div>
-    <div class="hint" id="hint"><span class="dot">!</span><span id="hintText"></span></div>
+    <div class="hint" id="hint"><svg class="i" id="hintIcon"><use href="#i-download"/></svg><span id="hintText"></span></div>
   </section>
 
   <section class="card">
     <div class="row">
-      <div class="cap grow" style="margin:0"><svg class="i"><use href="#i-filetext"/></svg>VĂN BẢN CẦN ĐỌC</div>
-      <button class="btn" id="open"><svg class="i"><use href="#i-folder"/></svg>Mở file TXT…</button>
-      <button class="btn" id="clear"><svg class="i"><use href="#i-trash"/></svg>Xoá</button>
+      <div class="cap grow" style="margin:0"><svg class="i"><use href="#i-filetext"/></svg>VĂN BẢN</div>
+      <button class="btn" id="open"><svg class="i"><use href="#i-folder"/></svg>Mở tệp .txt</button>
+      <button class="btn" id="clear"><svg class="i"><use href="#i-trash"/></svg>Xoá chữ</button>
       <input type="file" id="file" accept=".txt,text/plain" hidden>
     </div>
-    <textarea id="text" spellcheck="false" aria-label="Văn bản cần đọc"></textarea>
-    <div class="count" id="count"></div>
+    <textarea id="text" spellcheck="false" maxlength="100000" aria-label="Văn bản cần đọc"></textarea>
+    <div class="count"><span id="kbd"></span><span id="count"></span></div>
   </section>
 
   <section class="card run">
     <div id="status" role="status" aria-live="polite"></div>
-    <button class="btn" id="cancel" disabled>Hủy</button>
-    <button id="go"><svg class="i"><use href="#i-play"/></svg>Tạo giọng đọc</button>
+    <button class="btn" id="cancel" hidden>Huỷ</button>
+    <button id="go"><svg class="i"><use href="#i-play"/></svg><span id="goLabel">Tạo giọng đọc</span></button>
     <div class="bar" id="bar" hidden><i></i></div>
     <div class="result" id="result">
       <button class="play" id="play"><span class="b"><svg class="i"><use href="#i-play"/></svg></span><span id="playLabel">Nghe</span></button>
       <svg class="i"><use href="#i-file"/></svg>
       <div class="grow"><div class="name" id="rname"></div><div class="meta" id="rmeta"></div></div>
-      <a class="btn" id="save" download><svg class="i"><use href="#i-download"/></svg>Tải về</a>
+      <a class="btn" id="save" download><svg class="i"><use href="#i-download"/></svg>Tải file WAV</a>
     </div>
   </section>
 
   <footer>
-    <svg class="i"><use href="#i-info"/></svg><span class="grow" style="flex:1">Giọng tổng hợp do máy tạo · Văn bản không rời khỏi máy này</span>
+    <svg class="i"><use href="#i-info"/></svg><span class="grow" style="flex:1">Giọng đọc do máy tạo. Khi dùng hoặc chia sẻ file âm thanh, hãy ghi rõ đây là giọng máy.</span>
     <a href="licenses.html" target="_blank" rel="noopener"><svg class="i"><use href="#i-shield"/></svg>Giấy phép &amp; nguồn</a>
   </footer>
 </div>
 
 <dialog id="dataDlg">
-  <h2>Dữ liệu giọng</h2>
-  <div class="sub" style="margin-bottom:12px">Lần đầu dùng mỗi bộ giọng, trình duyệt tải dữ liệu về và giữ lại trên máy. Những lần sau dùng ngay, kể cả khi không có mạng.</div>
+  <h2>Dữ liệu giọng trên máy này</h2>
+  <div class="sub" style="margin-bottom:12px">Mỗi bộ giọng chỉ tải một lần và được lưu trong trình duyệt. Những lần sau dùng ngay, kể cả khi không có mạng.</div>
   <div id="engList"></div>
   <div class="row" style="margin-top:14px">
     <span class="grow sub" id="dataMsg"></span>
-    <button class="btn" id="wipe"><svg class="i"><use href="#i-trash"/></svg>Xoá dữ liệu đã tải</button>
+    <button class="btn" id="wipe"><svg class="i"><use href="#i-trash"/></svg>Xoá dữ liệu đã lưu</button>
     <button class="btn soft" id="closeDlg" style="height:36px">Đóng</button>
   </div>
 </dialog>
