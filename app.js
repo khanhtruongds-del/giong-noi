@@ -184,7 +184,7 @@ let spkTimer = null;
 text.addEventListener('input', () => { if (dialogue) { clearTimeout(spkTimer); spkTimer = setTimeout(renderSpeakers, 250); } });
 $('dlgMode').onclick = () => { dialogue = !(dialogue && !sylOn()); if (dialogue) sylMode = false; store.set('dialogue', dialogue ? '1' : '0'); store.set('sylMode', sylMode ? '1' : '0'); renderSpeakers(); if (placeholder) setPlaceholder(); };
 $('sylMode').onclick = () => { sylMode = !sylOn(); if (sylMode) dialogue = false; store.set('sylMode', sylMode ? '1' : '0'); store.set('dialogue', dialogue ? '1' : '0'); renderSpeakers(); if (placeholder) setPlaceholder(); };
-for (const [id, key] of [['sylGap', 'sylGap'], ['sylTones', 'sylTones'], ['sylWord', 'sylWord'], ['sylRepeat', 'sylRepeat']]) {
+for (const [id, key] of [['sylGap', 'sylGap'], ['sylWord', 'sylWord']]) {
   const el = $(id), v = store.get(key);
   if (v != null) { if (el.type === 'checkbox') el.checked = v === '1'; else el.value = v; }
   el.onchange = () => store.set(key, el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value);
@@ -232,7 +232,7 @@ $('go').onclick = () => {
   if (lastSyl) {
     worker.postMessage({ type: 'synthesize', mode: 'syllables', engine: L.engine, voice: single, text: content,
       speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
-      options: { gap: +$('sylGap').value, tones4: $('sylTones').checked, word: $('sylWord').checked, repeat: $('sylRepeat').checked ? 2 : 1 } });
+      options: { gap: +$('sylGap').value, word: $('sylWord').checked } });
     return;
   }
   worker.postMessage({ type: 'synthesize', engine: L.engine, lang, segments, speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
