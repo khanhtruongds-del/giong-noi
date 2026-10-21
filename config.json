@@ -1,5 +1,5 @@
 {
- "_ghi_chu": "Giọng Nam/Nữ của từng tiếng, chốt theo phiếu nghe 20/10/2026 (reports/listening/TONG_HOP.md). Supertonic: M1-M5, F1-F5. Tiếng Trung: Kokoro-82M-v1.1-zh, chốt zm_025 / zf_028 theo phiếu nghe 2 GV tiếng Trung 20/10/2026 (reports/listening/zh11/). 21/10/2026: chuyển cả 6 tiếng sang Qwen3-TTS 0.6B (WebGPU); trình duyệt không có WebGPU dùng lại giọng cũ (fallback). Âm tiết tiếng Trung vẫn dùng Kokoro.",
+ "_ghi_chu": "Từ 21/10/2026 cả 6 tiếng dùng Qwen3-TTS 0.6B (WebGPU), mô hình đặt ở Hugging Face (mục qwen). Giọng: 10 giọng trẻ (nu1-5, nam1-5) + cô/bác gái/bà, chú/bác trai/ông; tiếng Nhật dùng co_ja, bac_gai_ja. Đã bỏ Supertonic 3, Kokoro và chế độ Âm tiết.",
  "languages": {
   "de": {
    "name": "Đức",
@@ -51,11 +51,6 @@
      "bac_trai",
      "ong"
     ]
-   },
-   "fallback": {
-    "engine": "supertonic-3",
-    "male": "M1",
-    "female": "F4"
    }
   },
   "en": {
@@ -108,11 +103,6 @@
      "bac_trai",
      "ong"
     ]
-   },
-   "fallback": {
-    "engine": "supertonic-3",
-    "male": "M1",
-    "female": "F1"
    }
   },
   "fr": {
@@ -165,11 +155,6 @@
      "bac_trai",
      "ong"
     ]
-   },
-   "fallback": {
-    "engine": "supertonic-3",
-    "male": "M4",
-    "female": "F1"
    }
   },
   "zh": {
@@ -222,25 +207,6 @@
      "bac_trai",
      "ong"
     ]
-   },
-   "fallback": {
-    "engine": "kokoro-zh",
-    "male": "zm_025",
-    "female": "zf_028",
-    "dialogue_voices": {
-     "male": [
-      "zm_025",
-      "zm_010",
-      "zm_057",
-      "zm_066"
-     ],
-     "female": [
-      "zf_028",
-      "zf_047",
-      "zf_060",
-      "zf_071"
-     ]
-    }
    }
   },
   "ja": {
@@ -293,11 +259,6 @@
      "bac_trai",
      "ong"
     ]
-   },
-   "fallback": {
-    "engine": "supertonic-3",
-    "male": "M4",
-    "female": "F5"
    }
   },
   "ko": {
@@ -350,11 +311,6 @@
      "bac_trai",
      "ong"
     ]
-   },
-   "fallback": {
-    "engine": "supertonic-3",
-    "male": "M4",
-    "female": "F3"
    }
   }
  },

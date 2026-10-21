@@ -135,7 +135,7 @@ async function synthesize({ lang, segments, voice, text, pauses = { sentence: 0.
 self.onmessage = async ({ data }) => {
   try {
     if (data.type === 'synthesize') { if (data.ep) Object.assign(EP, data.ep); await synthesize(data); }
-    else if (data.type === 'status') post('cache', { engines: { qwen3: { ...(await cacheStatus()), webgpu: await hasWebGPU() } } });
+    else if (data.type === 'status') { caches.delete('giong-noi-models-v1').catch(() => {}); post('cache', { engines: { qwen3: { ...(await cacheStatus()), webgpu: await hasWebGPU() } } }); }   // the old engines' cache is no longer used
     else if (data.type === 'clear') { await caches.delete(CACHE); tts = null; post('cleared'); }
     else if (data.type === 'cancel') cancelled = true;
   } catch (err) {

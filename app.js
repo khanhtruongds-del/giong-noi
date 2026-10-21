@@ -1,23 +1,19 @@
 // UI: settings, text, job control, WAV export. Heavy work happens in worker.js.
 const $ = (id) => document.getElementById(id);
 const cfg = await (await fetch('config.json', { cache: 'no-cache' })).json();
-const manifest = await (await fetch('models/manifest.json', { cache: 'no-cache' })).json();
 const ORDER = ['de', 'en', 'fr', 'zh', 'ja', 'ko'];
-// Qwen3-TTS needs WebGPU; without it every language falls back to its previous engine and voices.
+// Qwen3-TTS runs on the graphics card through WebGPU; browsers without it cannot use the page.
 const GPU = await (async () => { try { return !!(navigator.gpu && await navigator.gpu.requestAdapter()); } catch { return false; } })();
-for (const [k, L] of Object.entries(cfg.languages))
-  if (L.engine === 'qwen3' && !GPU) cfg.languages[k] = { name: L.name, full: L.full, sample: L.sample, ...L.fallback };
-const isQwen = (L) => L.engine === 'qwen3';
-const engineBytes = (e) => (e === 'qwen3' ? cfg.qwen.bytes : manifest.engines[e].bytes);
+const NO_GPU = 'Trình duyệt này chưa có WebGPU nên không chạy được giọng đọc. Hãy mở trang bằng Chrome hoặc Edge bản mới trên máy tính.';
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
 
 let lang = ORDER.includes(store.get('lang')) ? store.get('lang') : 'de';
 let gender = store.get('gender') === 'male' ? 'male' : 'female';
 let placeholder = true, busy = false, cache = {}, lastUrl = null, mp3Url = null, lastDialogue = false, mp3w = null;
-let worker = null, qworker = null;
+let worker = null;
 let dialogue = store.get('dialogue') === '1';
-let sylMode = store.get('sylMode') === '1';
+let sylMode = false;   // syllable drill was Kokoro-only; removed with the old engines
 let lastSyl = false;
 const spkVoices = {};   // lang -> { speakerName: voiceId } chosen by the user this session
 
@@ -62,10 +58,8 @@ function refresh() {
   document.querySelectorAll('#langs .pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
   document.querySelectorAll('#genders .pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === gender));
   const L = cfg.languages[lang];
-  // Kokoro (Chinese) has no quality steps: hide the control instead of showing a dead dropdown.
-  const kokoro = L.engine.startsWith('kokoro'), qwen = isQwen(L);
-  $('qualityBox').hidden = kokoro || qwen;
-  $('speedBox').hidden = qwen;   // Qwen speaks at its own natural pace; there is no speed control in the model
+  $('qualityBox').hidden = true;
+  $('speedBox').hidden = true;   // Qwen speaks at its own natural pace; there is no speed control in the model
   // Languages with a "choices" list (Chinese, while teachers pick) let the user try every voice of that gender.
   const pool = (L.choices || {})[gender];
   $('voiceBox').hidden = !pool;
@@ -76,8 +70,8 @@ function refresh() {
     sel.value = pool.includes(saved) ? saved : L[gender];
     sel.onchange = () => store.set(`voice_${lang}_${gender}`, sel.value);
   }
-  $('opts').classList.toggle('one', (kokoro && !pool) || (qwen && !!pool));
-  const st = cache[L.engine];
+  $('opts').classList.toggle('one', true);
+  const st = cache.qwen3;
   const hint = $('hint');
   const who = `${L.full} · giọng ${gender === 'male' ? 'nam' : 'nữ'}`;
   if (st && st.complete) {
@@ -87,19 +81,17 @@ function refresh() {
   } else {
     hint.className = 'hint';
     $('hintIcon').innerHTML = '<use href="#i-download"/>';
-    const shared = qwen ? ' (dùng chung cho cả 6 tiếng)' : kokoro ? '' : ' (dùng chung cho Đức, Anh, Pháp, Nhật, Hàn)';
-    const size = engineBytes(L.engine), big = size > 1e9 ? `${(size / 1e9).toFixed(1)} GB` : mb(size);
-    $('hintText').textContent = `Lần đầu dùng ${L.full}, trang sẽ tải khoảng ${big} dữ liệu giọng${shared}. Chỉ tải một lần, sau đó dùng được cả khi không có mạng.${qwen ? ' Nên dùng Wi-Fi.' : ''}`;
+    $('hintText').textContent = GPU ? `Lần đầu dùng, trang sẽ tải khoảng ${(cfg.qwen.bytes / 1e9).toFixed(1)} GB dữ liệu giọng (dùng chung cho cả 6 tiếng). Chỉ tải một lần, sau đó dùng được cả khi không có mạng. Nên dùng Wi-Fi.` : NO_GPU;
   }
   if (placeholder) setPlaceholder();
   renderSpeakers();
-  $('go').disabled = busy;
+  $('go').disabled = busy || !GPU;
   $('goLabel').textContent = busy ? 'Đang tạo…' : 'Tạo giọng đọc';
   $('cancel').hidden = !busy;
   if (!busy && !$('status').textContent) idle();
 }
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-function idle() { setStatus('Nhập văn bản rồi bấm “Tạo giọng đọc”.'); }
+function idle() { if (GPU) setStatus('Nhập văn bản rồi bấm “Tạo giọng đọc”.'); else setStatus(NO_GPU, true); }
 $('kbd').innerHTML = `Mẹo: <kbd>${MAC ? '⌘' : 'Ctrl'}</kbd> + <kbd>Enter</kbd> để tạo nhanh`;
 
 // ---- text --------------------------------------------------------------------------------------
@@ -135,11 +127,7 @@ function parseDialogue(src) {
   return turns;
 }
 function voicePool(L, g) {
-  if (L.dialogue_voices) return L.dialogue_voices[g];   // curated list (Chinese: picked from the teachers' survey)
-  const all = manifest.engines[L.engine].voices;
-  const pre = L.engine.startsWith('kokoro') ? (g === 'male' ? 'zm_' : 'zf_') : (g === 'male' ? 'M' : 'F');
-  const ids = all.filter(v => v.startsWith(pre));
-  return [L[g], ...ids.filter(v => v !== L[g])];
+  return L.dialogue_voices[g];
 }
 const voiceLabel = (id, L) => `${(cfg.voice_labels || {})[id] || `${genderOf(id) === 'male' ? 'Nam' : 'Nữ'} ${id.replace(/^z[mf]_/, '')}`}${id === L.male || id === L.female ? ' (chính)' : ''}`;
 const genderOf = (id) => { const d = (cfg.languages[lang].dialogue_voices || {}); if (d.male?.includes(id)) return 'male'; if (d.female?.includes(id)) return 'female'; return id.startsWith('zm_') || id.startsWith('M') ? 'male' : 'female'; };
@@ -156,7 +144,7 @@ function speakerVoices(names) {
 }
 const sylOn = () => sylMode && lang === 'zh';
 function renderSpeakers() {
-  $('sylMode').hidden = lang !== 'zh';
+  $('sylMode').hidden = true;
   $('sylMode').setAttribute('aria-pressed', sylOn());
   $('sylOpts').hidden = !sylOn();
   $('dlgMode').setAttribute('aria-pressed', dialogue && !sylOn());
@@ -210,20 +198,16 @@ function spawn(file) {
   w.postMessage({ type: 'status' });
   return w;
 }
-function newWorker() {
-  worker = spawn('worker.js');
-  qworker = GPU ? spawn('qwen-worker.js') : null;
-}
-const workerFor = (engine) => (engine === 'qwen3' ? qworker : worker);
+function newWorker() { worker = GPU ? spawn('qwen-worker.js') : null; }
 const handlers = {
   status: (d) => setStatus(d.message),
   download: (d) => { setStatus(`Đang tải dữ liệu giọng lần đầu · ${mb(d.got)} / ${mb(d.total)} (${Math.round(100 * d.got / d.total)}%)`); progress(d.got / d.total); },
   progress: (d) => { setStatus(d.total > 1 ? `Đang tạo giọng đọc… đoạn ${d.done + 1}/${d.total}` : 'Đang tạo giọng đọc…'); progress(d.total > 1 ? d.done / d.total : null); },
-  done: (d) => { bar.hidden = true; showResult(d.audio, d.sampleRate); setStatus(`Đã xong · ${clock(d.audio.length / d.sampleRate)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); for (const w of [worker, qworker]) w?.postMessage({ type: 'status' }); },
+  done: (d) => { bar.hidden = true; showResult(d.audio, d.sampleRate); setStatus(`Đã xong · ${clock(d.audio.length / d.sampleRate)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); worker?.postMessage({ type: 'status' }); },
   error: (d) => { finish(); bar.hidden = true; setStatus(d.message, true); },
   cancelled: () => { finish(); bar.hidden = true; setStatus('Đã huỷ.'); },
   cache: (d) => { cache = { ...cache, ...d.engines }; refresh(); renderData(); },
-  cleared: () => { $('dataMsg').textContent = 'Đã xoá dữ liệu giọng.'; for (const w of [worker, qworker]) w?.postMessage({ type: 'status' }); },
+  cleared: () => { $('dataMsg').textContent = 'Đã xoá dữ liệu giọng.'; worker?.postMessage({ type: 'status' }); },
 };
 function finish() { busy = false; animate(false); refresh(); }
 const clock = (secs) => { secs = Math.round(secs); return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`; };
@@ -243,20 +227,11 @@ $('go').onclick = () => {
   }
   lastDialogue = dialogue && !sylOn() && segments.length > 1;
   lastSyl = sylOn();
-  if (lastSyl) {   // the syllable drill keeps Kokoro (it cuts tones out of a tone series, which needs Kokoro's durations)
-    const S = isQwen(L) ? L.fallback : L;
-    worker.postMessage({ type: 'synthesize', mode: 'syllables', engine: S.engine, voice: S[gender], text: content,
-      speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
-      options: { gap: +$('sylGap').value, word: $('sylWord').checked } });
-    return;
-  }
-  workerFor(L.engine).postMessage({ type: 'synthesize', engine: L.engine, lang, segments, speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
-                       steps: cfg.quality[$('quality').value] || 8, text: content,
-                       commaBreak: (cfg.pause_at_comma || []).includes(lang), pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {})[lang] || {}) } });
+  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, segments, text: content, pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {})[lang] || {}) } });
 };
 $('cancel').onclick = () => {
   // Terminating is the only way to stop a running ONNX call; the next job starts a fresh worker (models stay cached on disk).
-  worker.terminate(); qworker?.terminate(); newWorker(); finish(); bar.hidden = true; setStatus('Đã huỷ.');
+  worker?.terminate(); newWorker(); finish(); bar.hidden = true; setStatus('Đã huỷ.');
 };
 
 // ---- result / WAV ----------------------------------------------------------------------------
@@ -310,10 +285,10 @@ $('player').onplay = () => ($('playLabel').textContent = 'Dừng');
 $('player').onpause = $('player').onended = () => ($('playLabel').textContent = 'Nghe');
 
 // ---- data dialog -----------------------------------------------------------------------------
-const NAMES = { qwen3: 'Cả 6 tiếng (Qwen3-TTS 0.6B, cần WebGPU)', 'supertonic-3': 'Đức · Anh · Pháp · Nhật · Hàn (Supertonic 3)', 'kokoro-82m': 'Trung (Kokoro-82M)', 'kokoro-zh': 'Trung (Kokoro-82M v1.1-zh)' };
+const NAMES = { qwen3: 'Cả 6 tiếng (Qwen3-TTS 0.6B)' };
 function renderData() {
   const list = $('engList'); list.textContent = '';
-  const all = { ...(GPU ? { qwen3: { bytes: cfg.qwen.bytes } } : {}), ...manifest.engines };
+  const all = { qwen3: { bytes: cfg.qwen.bytes } };
   for (const [name, e] of Object.entries(all)) {
     const st = cache[name] || {};
     const row = document.createElement('div'); row.className = 'eng';
@@ -328,7 +303,7 @@ function renderData() {
 }
 $('data').onclick = () => { $('dataMsg').textContent = ''; renderData(); $('dataDlg').showModal(); };
 $('closeDlg').onclick = () => $('dataDlg').close();
-$('wipe').onclick = () => { if (confirm('Xoá dữ liệu giọng đã lưu trên máy này? Lần dùng sau sẽ phải tải lại.')) for (const w of [worker, qworker]) w?.postMessage({ type: 'clear' }); };
+$('wipe').onclick = () => { if (confirm('Xoá dữ liệu giọng đã lưu trên máy này? Lần dùng sau sẽ phải tải lại.')) worker?.postMessage({ type: 'clear' }); };
 
 newWorker();
 setPlaceholder();

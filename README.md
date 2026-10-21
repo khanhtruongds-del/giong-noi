@@ -1,11 +1,11 @@
 # Giọng nói offline — bản trình duyệt
 
-Đọc văn bản thành giọng nói ngay trong trình duyệt: Đức, Anh, Pháp, Nhật, Hàn (Supertonic 3) và Trung (Kokoro-82M-v1.1-zh).
-Model chạy trên máy người dùng bằng ONNX Runtime Web; văn bản không gửi lên máy chủ. Lần đầu dùng mỗi bộ giọng, trình duyệt
-tải dữ liệu (Supertonic ~200 MB, Kokoro ~163 MB) và giữ lại trong bộ nhớ đệm, sau đó dùng được khi không có mạng.
+Đọc văn bản thành giọng nói ngay trong trình duyệt cho 6 tiếng: Đức, Anh, Pháp, Trung, Nhật, Hàn, bằng Qwen3-TTS-12Hz-0.6B (Apache 2.0).
+Model chạy trên máy người dùng bằng ONNX Runtime Web (WebGPU); văn bản không gửi lên máy chủ. Lần đầu dùng, trình duyệt tải
+khoảng 1,9 GB từ https://huggingface.co/Khanhpls/qwen3-tts-web và giữ trong bộ nhớ đệm, sau đó dùng được khi không có mạng.
+Cần trình duyệt có WebGPU (Chrome, Edge bản mới trên máy tính).
 
-- `index.html`, `app.js` — giao diện; `worker.js` — chạy model; `text.js` — chia câu
-- `zh/` — chữ Hán → âm vị cho Kokoro v1.1-zh (bản JavaScript của misaki ZHFrontend + jieba posseg + pypinyin/pypinyin-dict + cn2an, khớp bản Python trên 6.121 câu thử)
-- `config.json` — giọng Nam/Nữ của từng tiếng (sửa ở đây để đổi giọng)
-- `models/` — model chia thành phần ≤ 45 MB (`tools/build_models.py`)
-- `licenses.html`, `LICENSES/` — giấy phép; giọng là giọng tổng hợp do máy tạo (OpenRAIL-M, Apache 2.0)
+- `index.html`, `app.js` — giao diện; `qwen-worker.js` — tải và chạy model; `qwen.js` — dựng câu lệnh, lấy mẫu, giải mã âm thanh; `text.js` — chia câu
+- `config.json` — giọng của từng tiếng (16 giọng: Nữ 1–5, Cô, Bác gái, Bà; Nam 1–5, Chú, Bác trai, Ông) và danh sách file model
+- `vendor/gpu/` — ONNX Runtime Web 1.30 (WebGPU); `vendor/tokenizers.min.mjs` — Hugging Face tokenizers.js
+- `licenses.html`, `LICENSES/` — giấy phép; giọng là giọng tổng hợp do máy tạo
