@@ -125,6 +125,7 @@ function parseDialogue(src) {
   return turns;
 }
 function voicePool(L, g) {
+  if (L.dialogue_voices) return L.dialogue_voices[g];   // curated list (Chinese: picked from the teachers' survey)
   const all = manifest.engines[L.engine].voices;
   const pre = L.engine.startsWith('kokoro') ? (g === 'male' ? 'zm_' : 'zf_') : (g === 'male' ? 'M' : 'F');
   const ids = all.filter(v => v.startsWith(pre));

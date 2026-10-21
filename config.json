@@ -31,7 +31,21 @@
       "engine": "kokoro-zh",
       "male": "zm_025",
       "female": "zf_028",
-      "sample": "早上好！你今天怎么样？"
+      "sample": "早上好！你今天怎么样？",
+      "dialogue_voices": {
+        "male": [
+          "zm_025",
+          "zm_010",
+          "zm_057",
+          "zm_066"
+        ],
+        "female": [
+          "zf_028",
+          "zf_047",
+          "zf_060",
+          "zf_071"
+        ]
+      }
     },
     "ja": {
       "name": "Nhật",
