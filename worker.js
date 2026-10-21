@@ -1,7 +1,8 @@
 // Inference worker: Supertonic 3 (en, fr, de, ja, ko) and Kokoro-82M-v1.1-zh (zh) with ONNX Runtime Web.
 // Everything runs on the user's machine; model files are fetched once and kept in the Cache API.
 import * as ort from './vendor/ort.wasm.min.mjs';
-import { loadZh11, g2pZh11 } from './zh/zh11.js';
+import { loadZh11, g2pZh11, syllablePs, isSyllable, hanziSyllables } from './zh/zh11.js';
+import { tone3 } from './zh/zh.js';
 import { sentenceChunks } from './text.js';
 
 const BASE = new URL('./', import.meta.url).href;
@@ -182,8 +183,9 @@ function kkFit(chunk) {   // keep the phoneme string within Kokoro's 510-symbol 
   return half.length > 1 ? half.flatMap(kkFit) : [chunk];
 }
 
-async function kkSynth(k, text, style, speed) {
-  const ps = g2pZh11(text).slice(0, 510);
+async function kkSynth(k, text, style, speed) { return kkRun(k, g2pZh11(text), style, speed); }
+async function kkRun(k, ps, style, speed) {
+  ps = ps.slice(0, 510);
   const ids = [...ps].map(c => k.vocab[c]).filter(v => v !== undefined);
   if (!ids.length) return new Float32Array(0);
   const row = Math.min(ps.length, 510) - 1;
@@ -250,9 +252,81 @@ async function synthesize({ engine, lang, segments, voice, text, speed, steps, c
   post('done', { audio, sampleRate: e.sr, chunks: total });
 }
 
+// ---- syllable drill (Chinese): "ma1 ma2", "nǐ hǎo" or 你好 -> each syllable alone, with a fixed gap ----
+const TONED = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/;
+function parsePinyinToken(tok) {
+  tok = tok.toLowerCase().replace(/u:|ü/g, 'v');
+  if (TONED.test(tok)) { const n = tone3(tok.normalize('NFC')).replace('ü', 'v'); return [{ base: n.slice(0, -1), tone: n.slice(-1) }]; }
+  const out = [];
+  for (const m of tok.matchAll(/([a-zv]+?)([1-5])|([a-zv]+)$/g)) out.push(m[3] ? { base: m[3], tone: '' } : { base: m[1], tone: m[2] });
+  return out;
+}
+function syllablePlan(text, { tones4 = false, word = true, repeat = 1, gap = 2 }) {
+  const steps = [], bad = [];
+  for (const tok of text.split(/[\s,，、;；。.!！?？/|]+/u).filter(Boolean)) {
+    const han = /[\u3400-\u9fff]/u.test(tok);
+    const syl = han ? hanziSyllables(tok) : parsePinyinToken(tok);
+    if (!syl.length || syl.some(s => !isSyllable(s.base))) { bad.push(tok); continue; }
+    for (const s of syl) for (const t of (tones4 || !s.tone ? ['1', '2', '3', '4'] : [s.tone])) for (let r = 0; r < repeat; r++) steps.push({ base: s.base, tone: t });
+    if (word && syl.length > 1) steps.push({ ps: han ? g2pZh11(tok) : syl.map(s => syllablePs(s.base, s.tone || '1')).join('') + '.' });
+  }
+  if (bad.length) throw new Error('Không nhận ra âm tiết: ' + bad.slice(0, 8).join(', ') + '. Hãy gõ chữ Hán hoặc pinyin có số thanh, ví dụ ma1, ni3hao3.');
+  if (!steps.length) throw new Error('Chưa có âm tiết nào để đọc.');
+  return { steps, gap };
+}
+// Read alone (or repeated), Kokoro gives a syllable the same contour whatever its tone. Read as a tone series
+// "ma1, ma2, ma3, ma4." every tone comes out clearly, so each syllable is spoken in its tone series and the
+// wanted tone is cut out at the model's own symbol durations.
+async function kkToneSeries(k, base, style, speed, withNeutral) {
+  const syls = (withNeutral ? ['1', '2', '3', '4', '5'] : ['1', '2', '3', '4']).map(t => syllablePs(base, t));
+  const ps = syls.join(', ') + '.';
+  const known = (s) => [...s].filter(c => k.vocab[c] !== undefined);
+  const ids = known(ps).map(c => k.vocab[c]);
+  const row = Math.min(ps.length, 510) - 1;
+  const input = new BigInt64Array(ids.length + 2);
+  ids.forEach((v, i) => { input[i + 1] = BigInt(v); });
+  const out = await k.sess.run({ input_ids: new ort.Tensor('int64', input, [1, input.length]),
+    ref_s: new ort.Tensor('float32', style.subarray(row * 256, row * 256 + 256), [1, 256]), speed: new ort.Tensor('float32', new Float32Array([speed]), []) });
+  const wav = out.waveform.data, dur = Array.from(out.duration.data, Number);
+  const spf = wav.length / dur.reduce((a, b) => a + b, 0);
+  const cum = [0]; for (const d of dur) cum.push(cum[cum.length - 1] + d);
+  const clips = []; let i = 1;   // index 0 is the leading pad token
+  const sep = known(', ').length;
+  for (const s of syls) {
+    const n = known(s).length;
+    const st = Math.max(0, Math.round(cum[i] * spf - 0.03 * k.sr)), en = Math.min(wav.length, Math.round(cum[i + n] * spf + 0.06 * k.sr));
+    const c = wav.slice(st, en), f = Math.min(Math.round(k.sr * 0.012), c.length >> 2);
+    for (let j = 0; j < f; j++) { c[j] *= j / f; c[c.length - 1 - j] *= j / f; }
+    clips.push(c); i += n + sep;
+  }
+  return clips;
+}
+async function synthesizeSyllables({ engine, voice, speed, text, options }) {
+  cancelled = false;
+  const e = await ensureEngine(engine);
+  if (e.kind !== 'kokoro') throw new Error('Chế độ âm tiết chỉ dùng cho tiếng Trung.');
+  const { steps, gap } = syllablePlan(text, options || {});
+  const style = await kkStyle(e, voice);
+  const series = new Map(), clips = [];
+  for (let i = 0; i < steps.length; i++) {
+    if (cancelled) throw new Error('cancelled');
+    post('progress', { done: i, total: steps.length });
+    const s = steps[i];
+    if (s.ps) { clips.push(trimSilence(await kkRun(e, s.ps, style, speed), e.sr)); continue; }
+    const key = s.base + (s.tone === '5' ? '+5' : '');
+    if (!series.has(key)) series.set(key, await kkToneSeries(e, s.base, style, speed, s.tone === '5'));
+    clips.push(series.get(key)[+s.tone - 1]);
+  }
+  const pause = new Float32Array(Math.round(gap * e.sr));
+  const pieces = clips.flatMap((c, i) => (i ? [pause, c] : [c]));
+  const audio = new Float32Array(pieces.reduce((a, p) => a + p.length, 0));
+  let off = 0; for (const p of pieces) { audio.set(p, off); off += p.length; }
+  post('done', { audio, sampleRate: e.sr, chunks: clips.length });
+}
+
 self.onmessage = async ({ data }) => {
   try {
-    if (data.type === 'synthesize') await synthesize(data);
+    if (data.type === 'synthesize') await (data.mode === 'syllables' ? synthesizeSyllables(data) : synthesize(data));
     else if (data.type === 'status') {
       const m = await getManifest();
       const out = {};

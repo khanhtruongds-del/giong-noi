@@ -11,6 +11,8 @@ let gender = store.get('gender') === 'male' ? 'male' : 'female';
 let placeholder = true, busy = false, cache = {}, lastUrl = null, mp3Url = null, lastDialogue = false, mp3w = null;
 let worker = null;
 let dialogue = store.get('dialogue') === '1';
+let sylMode = store.get('sylMode') === '1';
+let lastSyl = false;
 const spkVoices = {};   // lang -> { speakerName: voiceId } chosen by the user this session
 
 // ---- header waveform ------------------------------------------------------------------------
@@ -94,7 +96,7 @@ $('kbd').innerHTML = `Mẹo: <kbd>${MAC ? '⌘' : 'Ctrl'}</kbd> + <kbd>Enter</kb
 
 // ---- text --------------------------------------------------------------------------------------
 const text = $('text');
-function setPlaceholder() { text.value = ''; text.placeholder = `Nhập hoặc dán văn bản vào đây, ví dụ:\n${cfg.languages[lang].sample}`; placeholder = true; count(); }
+function setPlaceholder() { text.value = ''; text.placeholder = sylMode && lang === 'zh' ? 'Gõ chữ Hán hoặc pinyin có số thanh, ví dụ:\nma1 ma2 ma3 ma4\n你好' : `Nhập hoặc dán văn bản vào đây, ví dụ:\n${cfg.languages[lang].sample}`; placeholder = true; count(); }
 function count() { const n = text.value.length; $('count').textContent = n ? `${n.toLocaleString('vi-VN')} / 100.000 ký tự` : ''; }
 text.addEventListener('input', () => { placeholder = !text.value; count(); });
 text.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!busy) $('go').click(); } });
@@ -144,9 +146,14 @@ function speakerVoices(names) {
   });
   return map;
 }
+const sylOn = () => sylMode && lang === 'zh';
 function renderSpeakers() {
-  $('dlgMode').setAttribute('aria-pressed', dialogue);
-  $('speakers').hidden = !dialogue;
+  $('sylMode').hidden = lang !== 'zh';
+  $('sylMode').setAttribute('aria-pressed', sylOn());
+  $('sylOpts').hidden = !sylOn();
+  $('dlgMode').setAttribute('aria-pressed', dialogue && !sylOn());
+  $('speakers').hidden = !dialogue || sylOn();
+  if (sylOn()) return;
   if (!dialogue) return;
   const L = cfg.languages[lang];
   const turns = parseDialogue(placeholder ? '' : text.value);
@@ -175,7 +182,13 @@ function renderSpeakers() {
 }
 let spkTimer = null;
 text.addEventListener('input', () => { if (dialogue) { clearTimeout(spkTimer); spkTimer = setTimeout(renderSpeakers, 250); } });
-$('dlgMode').onclick = () => { dialogue = !dialogue; store.set('dialogue', dialogue ? '1' : '0'); renderSpeakers(); };
+$('dlgMode').onclick = () => { dialogue = !(dialogue && !sylOn()); if (dialogue) sylMode = false; store.set('dialogue', dialogue ? '1' : '0'); store.set('sylMode', sylMode ? '1' : '0'); renderSpeakers(); if (placeholder) setPlaceholder(); };
+$('sylMode').onclick = () => { sylMode = !sylOn(); if (sylMode) dialogue = false; store.set('sylMode', sylMode ? '1' : '0'); store.set('dialogue', dialogue ? '1' : '0'); renderSpeakers(); if (placeholder) setPlaceholder(); };
+for (const [id, key] of [['sylGap', 'sylGap'], ['sylTones', 'sylTones'], ['sylWord', 'sylWord'], ['sylRepeat', 'sylRepeat']]) {
+  const el = $(id), v = store.get(key);
+  if (v != null) { if (el.type === 'checkbox') el.checked = v === '1'; else el.value = v; }
+  el.onchange = () => store.set(key, el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value);
+}
 
 // ---- job ---------------------------------------------------------------------------------------
 const bar = $('bar');
@@ -209,12 +222,19 @@ $('go').onclick = () => {
   $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null); refresh();
   const single = (L.choices || {})[gender] ? $('voice').value : L[gender];
   let segments = [{ text: content, voice: single }];
-  if (dialogue) {
+  if (dialogue && !sylOn()) {
     const turns = parseDialogue(content);
     const map = speakerVoices([...new Set(turns.map(t => t.speaker || '(không tên)'))]);
     segments = turns.map(t => ({ text: t.text, voice: map[t.speaker || '(không tên)'] }));
   }
-  lastDialogue = dialogue && segments.length > 1;
+  lastDialogue = dialogue && !sylOn() && segments.length > 1;
+  lastSyl = sylOn();
+  if (lastSyl) {
+    worker.postMessage({ type: 'synthesize', mode: 'syllables', engine: L.engine, voice: single, text: content,
+      speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
+      options: { gap: +$('sylGap').value, tones4: $('sylTones').checked, word: $('sylWord').checked, repeat: $('sylRepeat').checked ? 2 : 1 } });
+    return;
+  }
   worker.postMessage({ type: 'synthesize', engine: L.engine, lang, segments, speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
                        steps: cfg.quality[$('quality').value] || 8, text: content,
                        commaBreak: (cfg.pause_at_comma || []).includes(lang), pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {})[lang] || {}) } });
@@ -238,7 +258,7 @@ function filename() {
   const src = lastDialogue ? parseDialogue(text.value).map(t => t.text).join(' ') : text.value;
   const words = (src.match(/[\p{L}\p{N}]+/gu) || []).slice(0, 5).join('-').slice(0, 40) || 'giong-noi';
   const L = cfg.languages[lang], who = (L.choices || {})[gender] ? $('voice').value : (gender === 'male' ? 'nam' : 'nu');
-  return `${lang}_${lastDialogue ? 'hoithoai' : who}_${words}`;
+  return `${lang}_${lastSyl ? 'amtiet' : lastDialogue ? 'hoithoai' : who}_${words}`;
 }
 function showResult(samples, sr) {
   const blob = wav(samples, sr);

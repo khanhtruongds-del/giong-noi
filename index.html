@@ -116,6 +116,11 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
 .spk .who small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
 .spk .pill { height: 32px; min-width: 56px; padding: 0 12px; }
 .spk select { height: 34px; }
+.sylrow { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; font-size: 14px; font-weight: 600; }
+.sylrow label { display: inline-flex; align-items: center; gap: 8px; }
+.sylrow select { width: auto; height: 34px; }
+.sylrow input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); }
+#sylMode[hidden] { display: none; }
 .result .btn.main { background: var(--accent); color: #fff; }
 .result .btn.main:hover { background: var(--accent-hover); }
 .result .btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
@@ -205,6 +210,7 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   <section class="card">
     <div class="row">
       <div class="cap grow" style="margin:0"><svg class="i"><use href="#i-filetext"/></svg>VĂN BẢN</div>
+      <button class="btn" id="sylMode" aria-pressed="false" hidden title="Đọc từng âm tiết như bảng pinyin, có khoảng nghỉ giữa các âm"><svg class="i"><use href="#i-audio"/></svg>Âm tiết</button>
       <button class="btn" id="dlgMode" aria-pressed="false" title="Mỗi dòng bắt đầu bằng tên người nói, ví dụ  Anna: Hallo!"><svg class="i"><use href="#i-users"/></svg>Hội thoại</button>
       <button class="btn" id="open"><svg class="i"><use href="#i-folder"/></svg>Mở tệp .txt</button>
       <button class="btn" id="clear"><svg class="i"><use href="#i-trash"/></svg>Xoá chữ</button>
@@ -212,6 +218,16 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
     </div>
     <textarea id="text" spellcheck="false" maxlength="100000" aria-label="Văn bản cần đọc"></textarea>
     <div class="count"><span id="kbd"></span><span id="count"></span></div>
+    <div class="speakers" id="sylOpts" hidden>
+      <div class="cap" style="margin-bottom:4px"><svg class="i"><use href="#i-audio"/></svg>ĐỌC TỪNG ÂM TIẾT</div>
+      <div class="help">Gõ chữ Hán (<code>你好</code>) hoặc pinyin có số thanh (<code>ma1 ma2 ma3 ma4</code>, <code>ni3hao3</code>). Pinyin không có số thanh (<code>ma</code>) sẽ đọc đủ 4 thanh. Mỗi âm được đọc riêng, không biến điệu.</div>
+      <div class="sylrow">
+        <label>Khoảng nghỉ <select id="sylGap"><option value="1">1 giây</option><option value="1.5">1,5 giây</option><option value="2" selected>2 giây</option><option value="3">3 giây</option></select></label>
+        <label><input type="checkbox" id="sylTones"> Đọc cả 4 thanh</label>
+        <label><input type="checkbox" id="sylWord" checked> Đọc cả từ ở cuối</label>
+        <label><input type="checkbox" id="sylRepeat"> Lặp mỗi âm 2 lần</label>
+      </div>
+    </div>
     <div class="speakers" id="speakers" hidden>
       <div class="cap" style="margin-bottom:4px"><svg class="i"><use href="#i-users"/></svg>NGƯỜI NÓI</div>
       <div class="help">Mỗi lượt thoại một dòng, bắt đầu bằng tên và dấu hai chấm, ví dụ <code>Anna: Guten Tag!</code>. Dòng không có tên được đọc tiếp bằng giọng của lượt trước. Tên không được đọc lên.</div>

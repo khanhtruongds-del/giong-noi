@@ -65,7 +65,7 @@ export function transformAn2Cn(text) {
 const MARKS = { 'ā': 'a1', 'á': 'a2', 'ǎ': 'a3', 'à': 'a4', 'ē': 'e1', 'é': 'e2', 'ě': 'e3', 'è': 'e4', 'ī': 'i1', 'í': 'i2', 'ǐ': 'i3', 'ì': 'i4',
   'ō': 'o1', 'ó': 'o2', 'ǒ': 'o3', 'ò': 'o4', 'ū': 'u1', 'ú': 'u2', 'ǔ': 'u3', 'ù': 'u4', 'ǖ': 'v1', 'ǘ': 'v2', 'ǚ': 'v3', 'ǜ': 'v4', 'ü': 'v0',
   'ń': 'n2', 'ň': 'n3', 'ǹ': 'n4', 'ḿ': 'm2' };
-function tone3(py) {
+export function tone3(py) {
   let tone = '5', out = '';
   for (const c of py.normalize('NFC')) { const m = MARKS[c]; if (m) { out += m[0]; if (m[1] !== '0') tone = m[1]; } else out += c; }
   return out + tone;

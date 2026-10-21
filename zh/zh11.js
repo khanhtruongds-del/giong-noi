@@ -4,15 +4,16 @@
 // Sources ported: misaki (Apache-2.0, adapted from PaddleSpeech, Apache-2.0), jieba posseg (MIT),
 // pypinyin + pypinyin-dict (MIT), cn2an (MIT); jieba segmentation via jieba-wasm (MIT).
 import initJieba, { cut, cut_for_search } from './jieba_rs_wasm.js';
-import { transformAn2Cn, mapPunctuation } from './zh.js';
+import { transformAn2Cn, mapPunctuation, tone3 } from './zh.js';
 
-let CH, PH, PREFIX, SYL, TAGS, FREQ, HMM, NUMX, ready = null;
+let CH, PH, PREFIX, SYL, TAGS, FREQ, HMM, NUMX, SYLB, ready = null;
 
 const lines = (t) => t.split('\n').filter(Boolean);
 export function loadZh11(base) {
   if (!ready) ready = (async () => {
     const get = (f) => fetch(base + f).then(r => { if (!r.ok) throw new Error(f); return f.endsWith('.json') ? r.json() : r.text(); });
-    const [c, p, s, t, h, m] = await Promise.all(['py_chars.txt', 'py_phrases.txt', 'py_syl.json', 'jieba_tags.txt', 'pos_hmm.json', 'misc.json'].map(get));
+    const [c, p, s, t, h, m, b] = await Promise.all(['py_chars.txt', 'py_phrases.txt', 'py_syl.json', 'jieba_tags.txt', 'pos_hmm.json', 'misc.json', 'syllables.json'].map(get));
+    SYLB = b;
     CH = new Map(lines(c).map(l => l.split('\t')));
     PH = new Map(lines(p).map(l => { const i = l.indexOf('\t'); return [l.slice(0, i), l.slice(i + 1).split(' ')]; }));
     PREFIX = new Set();
@@ -374,4 +375,36 @@ export function g2pZh11(text, en = null) {
     else segs.push(en ? en(e) : UNK);
   }
   return segs.join(' ');
+}
+
+// ---- single syllables (pinyin-chart style drills) --------------------------------------------------
+// Each syllable is read on its own, without tone sandhi, the way a pinyin chart pronounces it.
+function finFix(c, v) {
+  if (/^i\d/.test(v)) { if (['z', 'c', 's'].includes(c)) return v.replaceAll('i', 'ii'); if (['zh', 'ch', 'sh', 'r'].includes(c)) return v.replaceAll('i', 'iii'); }
+  return v;
+}
+export function syllablePs(base, tone) {
+  const e = SYLB[base]; if (!e) return null;
+  const phones = [e[0], finFix(e[0], e[1] + tone)].filter(Boolean);
+  const ps = phones.join('_').replaceAll('_eR', '_er').replaceAll('R', '_R').replace(/(?=\d)/gu, '_').split('_');
+  return ps.map(p => ZH_MAP[p] ?? UNK).join('');
+}
+export const isSyllable = (base) => !!SYLB[base];
+// Chinese characters -> [{base, tone}] using the same word-level pinyin readings as the sentence reader.
+export function hanziSyllables(text) {
+  const out = [];
+  for (const run of text.match(/[\u3400-\u9fff]+/gu) || []) {
+    for (const w of cut(run, true)) {
+      for (const piece of mmseg(w)) {
+        const raws = PH.has(piece) ? PH.get(piece) : chars(piece).map(c => CH.get(c) ?? null);
+        chars(piece).forEach((c, i) => {
+          if (c === '嗯') { out.push({ han: c, base: 'en', tone: '2' }); return; }
+          const r = raws[i]; if (r == null) return;
+          // 一 and 不 change tone in context; a drill reads their citation tone.
+          const n = c === '一' ? 'yi1' : c === '不' ? 'bu4' : tone3(r).replace('ü', 'v'); out.push({ han: c, base: n.slice(0, -1), tone: n.slice(-1) });
+        });
+      }
+    }
+  }
+  return out;
 }
