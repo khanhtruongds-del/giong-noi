@@ -16,11 +16,14 @@ a{color:var(--accent)}td,th{text-align:left;padding:6px 8px;border-top:1px solid
 <div class="card">
 <h2 style="margin-top:0">Giọng đọc là giọng tổng hợp do máy tạo</h2>
 <p>Khi dùng hoặc chia sẻ âm thanh tạo ra từ trang này (bài giảng, video, mạng xã hội…), hãy ghi rõ đó là <b>giọng do máy tạo</b>.</p>
-<p><b>Đức, Anh, Pháp, Nhật, Hàn</b> — Supertonic 3 của Supertone Inc., giấy phép <a href="LICENSES/supertonic-3-OpenRAIL-M.txt">BigScience OpenRAIL-M</a>.
+<p><b>Cả 6 tiếng (giọng chính, cần WebGPU)</b> — Qwen3-TTS-12Hz-0.6B-Base và Qwen3-TTS-Tokenizer-12Hz của nhóm Qwen (Alibaba), giấy phép <a href="LICENSES/qwen3-tts-Apache-2.0.txt">Apache 2.0</a>.
+Dự án chuyển sang ONNX (phần talker lưu trọng số 8-bit) và đặt tại <a href="https://huggingface.co/Khanhpls/qwen3-tts-web">huggingface.co/Khanhpls/qwen3-tts-web</a>.
+Các giọng là giọng tổng hợp được thiết kế bằng Qwen3-TTS-12Hz-1.7B-VoiceDesign từ mô tả bằng chữ, không sao chép giọng người thật.</p>
+<p><b>Giọng dự phòng khi trình duyệt không có WebGPU — Đức, Anh, Pháp, Nhật, Hàn</b> — Supertonic 3 của Supertone Inc., giấy phép <a href="LICENSES/supertonic-3-OpenRAIL-M.txt">BigScience OpenRAIL-M</a>.
 Người dùng phải tuân thủ các hạn chế sử dụng tại Attachment A, trong đó có: không dùng để vi phạm pháp luật, gây hại trẻ em, tạo thông tin sai nhằm gây hại,
 mạo danh người khác (deepfake) khi không được đồng ý, quấy rối, phân biệt đối xử, và không đăng tải nội dung do máy tạo mà không ghi rõ là do máy tạo.
 Trọng số được lưu ở dạng float16 để giảm dung lượng.</p>
-<p><b>Trung (Quan thoại)</b> — Kokoro-82M-v1.1-zh của hexgrad (dữ liệu tiếng Trung do LongMaoData cấp phép), giấy phép <a href="LICENSES/kokoro-Apache-2.0.txt">Apache 2.0</a>; dự án chuyển sang ONNX và lưu float16.</p>
+<p><b>Trung (Quan thoại) — dự phòng và chế độ Âm tiết</b> — Kokoro-82M-v1.1-zh của hexgrad (dữ liệu tiếng Trung do LongMaoData cấp phép), giấy phép <a href="LICENSES/kokoro-Apache-2.0.txt">Apache 2.0</a>; dự án chuyển sang ONNX và lưu float16.</p>
 </div>
 
 <h2>Thành phần phần mềm</h2>
@@ -28,6 +31,8 @@ Trọng số được lưu ở dạng float16 để giảm dung lượng.</p>
 <tr><th>Thành phần</th><th>Dùng để</th><th>Giấy phép</th></tr>
 <tr><td>ONNX Runtime Web</td><td>Chạy model trong trình duyệt</td><td><a href="LICENSES/onnxruntime.txt">MIT</a></td></tr>
 <tr><td>supertonic (mã Python, chuyển sang JavaScript)</td><td>Cách xử lý văn bản và lấy mẫu của Supertonic</td><td><a href="LICENSES/supertonic-code.txt">MIT</a></td></tr>
+<tr><td>Hugging Face tokenizers.js</td><td>Tách token văn bản cho Qwen3-TTS</td><td><a href="LICENSES/qwen3-tts-Apache-2.0.txt">Apache 2.0</a></td></tr>
+<tr><td>qwen_tts (mã Python, chuyển sang JavaScript)</td><td>Cách dựng câu lệnh và lấy mẫu của Qwen3-TTS</td><td><a href="LICENSES/qwen3-tts-Apache-2.0.txt">Apache 2.0</a></td></tr>
 <tr><td>misaki</td><td>Chữ Hán → âm vị cho Kokoro (chuyển sang JavaScript)</td><td><a href="LICENSES/misaki.txt">Apache 2.0</a></td></tr>
 <tr><td>jieba-wasm, jieba</td><td>Tách từ tiếng Trung</td><td><a href="LICENSES/jieba-wasm.txt">MIT</a>, <a href="LICENSES/jieba.txt">MIT</a></td></tr>
 <tr><td>pypinyin (từ điển + thuật toán, chuyển sang JavaScript)</td><td>Phiên âm pinyin</td><td><a href="LICENSES/pypinyin.txt">MIT</a></td></tr>

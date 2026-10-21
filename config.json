@@ -1,96 +1,424 @@
 {
-  "_ghi_chu": "Giọng Nam/Nữ của từng tiếng, chốt theo phiếu nghe 20/10/2026 (reports/listening/TONG_HOP.md). Supertonic: M1-M5, F1-F5. Tiếng Trung: Kokoro-82M-v1.1-zh, chốt zm_025 / zf_028 theo phiếu nghe 2 GV tiếng Trung 20/10/2026 (reports/listening/zh11/).",
-  "languages": {
-    "de": {
-      "name": "Đức",
-      "full": "Tiếng Đức",
-      "engine": "supertonic-3",
-      "male": "M1",
-      "female": "F4",
-      "sample": "Guten Morgen! Wie geht es Ihnen heute?"
-    },
-    "en": {
-      "name": "Anh",
-      "full": "Tiếng Anh",
-      "engine": "supertonic-3",
-      "male": "M1",
-      "female": "F1",
-      "sample": "Good morning! How are you today?"
-    },
-    "fr": {
-      "name": "Pháp",
-      "full": "Tiếng Pháp",
-      "engine": "supertonic-3",
-      "male": "M4",
-      "female": "F1",
-      "sample": "Bonjour ! Comment allez-vous aujourd'hui ?"
-    },
-    "zh": {
-      "name": "Trung",
-      "full": "Tiếng Trung (Quan thoại)",
-      "engine": "kokoro-zh",
-      "male": "zm_025",
-      "female": "zf_028",
-      "sample": "早上好！你今天怎么样？",
-      "dialogue_voices": {
-        "male": [
-          "zm_025",
-          "zm_010",
-          "zm_057",
-          "zm_066"
-        ],
-        "female": [
-          "zf_028",
-          "zf_047",
-          "zf_060",
-          "zf_071"
-        ]
-      }
-    },
-    "ja": {
-      "name": "Nhật",
-      "full": "Tiếng Nhật",
-      "engine": "supertonic-3",
-      "male": "M4",
-      "female": "F5",
-      "sample": "おはようございます。今日もよろしくお願いします。"
-    },
-    "ko": {
-      "name": "Hàn",
-      "full": "Tiếng Hàn",
-      "engine": "supertonic-3",
-      "male": "M4",
-      "female": "F3",
-      "sample": "안녕하세요. 만나서 반갑습니다."
+ "_ghi_chu": "Giọng Nam/Nữ của từng tiếng, chốt theo phiếu nghe 20/10/2026 (reports/listening/TONG_HOP.md). Supertonic: M1-M5, F1-F5. Tiếng Trung: Kokoro-82M-v1.1-zh, chốt zm_025 / zf_028 theo phiếu nghe 2 GV tiếng Trung 20/10/2026 (reports/listening/zh11/). 21/10/2026: chuyển cả 6 tiếng sang Qwen3-TTS 0.6B (WebGPU); trình duyệt không có WebGPU dùng lại giọng cũ (fallback). Âm tiết tiếng Trung vẫn dùng Kokoro.",
+ "languages": {
+  "de": {
+   "name": "Đức",
+   "full": "Tiếng Đức",
+   "engine": "qwen3",
+   "male": "nam1",
+   "female": "nu1",
+   "sample": "Guten Morgen! Wie geht es Ihnen heute?",
+   "choices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "dialogue_voices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "fallback": {
+    "engine": "supertonic-3",
+    "male": "M1",
+    "female": "F4"
+   }
+  },
+  "en": {
+   "name": "Anh",
+   "full": "Tiếng Anh",
+   "engine": "qwen3",
+   "male": "nam1",
+   "female": "nu1",
+   "sample": "Good morning! How are you today?",
+   "choices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "dialogue_voices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "fallback": {
+    "engine": "supertonic-3",
+    "male": "M1",
+    "female": "F1"
+   }
+  },
+  "fr": {
+   "name": "Pháp",
+   "full": "Tiếng Pháp",
+   "engine": "qwen3",
+   "male": "nam1",
+   "female": "nu1",
+   "sample": "Bonjour ! Comment allez-vous aujourd'hui ?",
+   "choices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "dialogue_voices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "fallback": {
+    "engine": "supertonic-3",
+    "male": "M4",
+    "female": "F1"
+   }
+  },
+  "zh": {
+   "name": "Trung",
+   "full": "Tiếng Trung (Quan thoại)",
+   "engine": "qwen3",
+   "male": "nam1",
+   "female": "nu1",
+   "sample": "早上好！你今天怎么样？",
+   "choices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "dialogue_voices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "fallback": {
+    "engine": "kokoro-zh",
+    "male": "zm_025",
+    "female": "zf_028",
+    "dialogue_voices": {
+     "male": [
+      "zm_025",
+      "zm_010",
+      "zm_057",
+      "zm_066"
+     ],
+     "female": [
+      "zf_028",
+      "zf_047",
+      "zf_060",
+      "zf_071"
+     ]
     }
+   }
   },
-  "quality": {
-    "Nhanh": 5,
-    "Cân bằng": 8,
-    "Chất lượng cao": 16
+  "ja": {
+   "name": "Nhật",
+   "full": "Tiếng Nhật",
+   "engine": "qwen3",
+   "male": "nam1",
+   "female": "nu1",
+   "sample": "おはようございます。今日もよろしくお願いします。",
+   "choices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co_ja",
+     "bac_gai_ja",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "dialogue_voices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co_ja",
+     "bac_gai_ja",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "fallback": {
+    "engine": "supertonic-3",
+    "male": "M4",
+    "female": "F5"
+   }
   },
-  "speed": {
-    "Chậm": 0.8,
-    "Vừa": 0.9,
-    "Tự nhiên": 1.0
-  },
-  "default_speed": "Vừa",
-  "pause_at_comma": [
-    "ja",
-    "zh"
-  ],
-  "pauses": {
-    "sentence": 0.3,
-    "comma": 0.15,
-    "turn": 0.6
-  },
-  "speed_scale": {
-    "zh": 0.9
-  },
-  "pauses_by_lang": {
-    "zh": {
-      "sentence": 0.5,
-      "comma": 0.25
-    }
+  "ko": {
+   "name": "Hàn",
+   "full": "Tiếng Hàn",
+   "engine": "qwen3",
+   "male": "nam1",
+   "female": "nu1",
+   "sample": "안녕하세요. 만나서 반갑습니다.",
+   "choices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "dialogue_voices": {
+    "female": [
+     "nu1",
+     "nu2",
+     "nu3",
+     "nu4",
+     "nu5",
+     "co",
+     "bac_gai",
+     "ba"
+    ],
+    "male": [
+     "nam1",
+     "nam2",
+     "nam3",
+     "nam4",
+     "nam5",
+     "chu",
+     "bac_trai",
+     "ong"
+    ]
+   },
+   "fallback": {
+    "engine": "supertonic-3",
+    "male": "M4",
+    "female": "F3"
+   }
   }
+ },
+ "quality": {
+  "Nhanh": 5,
+  "Cân bằng": 8,
+  "Chất lượng cao": 16
+ },
+ "speed": {
+  "Chậm": 0.8,
+  "Vừa": 0.9,
+  "Tự nhiên": 1.0
+ },
+ "default_speed": "Vừa",
+ "pause_at_comma": [
+  "ja",
+  "zh"
+ ],
+ "pauses": {
+  "sentence": 0.3,
+  "comma": 0.15,
+  "turn": 0.6
+ },
+ "speed_scale": {
+  "zh": 0.9
+ },
+ "pauses_by_lang": {
+  "zh": {
+   "sentence": 0.5,
+   "comma": 0.25
+  }
+ },
+ "voice_labels": {
+  "nu1": "Nữ 1",
+  "nu2": "Nữ 2",
+  "nu3": "Nữ 3",
+  "nu4": "Nữ 4",
+  "nu5": "Nữ 5",
+  "co": "Cô",
+  "co_ja": "Cô",
+  "bac_gai": "Bác gái",
+  "bac_gai_ja": "Bác gái",
+  "ba": "Bà",
+  "nam1": "Nam 1",
+  "nam2": "Nam 2",
+  "nam3": "Nam 3",
+  "nam4": "Nam 4",
+  "nam5": "Nam 5",
+  "chu": "Chú",
+  "bac_trai": "Bác trai",
+  "ong": "Ông"
+ },
+ "qwen": {
+  "base": "https://huggingface.co/Khanhpls/qwen3-tts-web/resolve/main/",
+  "files": {
+   "tokenizer.json": 11422654,
+   "tokenizer_config.json": 0,
+   "voices.json": 401991,
+   "text.f16": 311164928,
+   "codec.f32": 12582912,
+   "talker_decode_q8nb.onnx": 501811182,
+   "cp_fused2_f32.onnx": 568591688,
+   "decoder_f32.onnx": 456825792
+  },
+  "bytes": 1862801147
+ }
 }
