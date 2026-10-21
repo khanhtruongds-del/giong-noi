@@ -198,7 +198,7 @@ function spawn(file) {
   w.postMessage({ type: 'status' });
   return w;
 }
-function newWorker() { worker = GPU ? spawn('qwen-worker.js') : null; }
+function newWorker() { worker = GPU ? spawn('qwen-worker.js?v=20261021b') : null; }
 const handlers = {
   status: (d) => setStatus(d.message),
   download: (d) => { setStatus(`Đang tải dữ liệu giọng lần đầu · ${mb(d.got)} / ${mb(d.total)} (${Math.round(100 * d.got / d.total)}%)`); progress(d.got / d.total); },
