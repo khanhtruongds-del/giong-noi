@@ -8,8 +8,10 @@ const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch {
 
 let lang = ORDER.includes(store.get('lang')) ? store.get('lang') : 'de';
 let gender = store.get('gender') === 'male' ? 'male' : 'female';
-let placeholder = true, busy = false, cache = {}, lastUrl = null;
+let placeholder = true, busy = false, cache = {}, lastUrl = null, mp3Url = null, lastDialogue = false, mp3w = null;
 let worker = null;
+let dialogue = store.get('dialogue') === '1';
+const spkVoices = {};   // lang -> { speakerName: voiceId } chosen by the user this session
 
 // ---- header waveform ------------------------------------------------------------------------
 const BARS = [0.35, 0.6, 0.9, 0.55, 0.75, 0.4];
@@ -80,6 +82,7 @@ function refresh() {
     $('hintText').textContent = `Lần đầu dùng ${L.full}, trang sẽ tải khoảng ${mb(manifest.engines[L.engine].bytes)} dữ liệu giọng${shared}. Chỉ tải một lần, sau đó dùng được cả khi không có mạng.`;
   }
   if (placeholder) setPlaceholder();
+  renderSpeakers();
   $('go').disabled = busy;
   $('goLabel').textContent = busy ? 'Đang tạo…' : 'Tạo giọng đọc';
   $('cancel').hidden = !busy;
@@ -106,6 +109,72 @@ $('file').onchange = async () => {
   if (text.value.trim() && !confirm('Thay văn bản đang có bằng nội dung tệp?')) return;
   text.value = t; placeholder = !t; count();
 };
+
+// ---- dialogue (multi-speaker) -------------------------------------------------------------------
+// A line "Name: text" starts a turn; lines without a name continue the previous speaker.
+const TURN = /^\s*([^:：\n.。!?！？…"“”()（）]{1,24}?)\s*[:：]\s*(.*)$/u;
+function parseDialogue(src) {
+  const turns = [];
+  for (const line of src.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const m = line.match(TURN);
+    if (m && m[2].trim()) turns.push({ speaker: m[1].trim(), text: m[2].trim() });
+    else if (turns.length) turns[turns.length - 1].text += '\n' + line.trim();
+    else turns.push({ speaker: '', text: line.trim() });
+  }
+  return turns;
+}
+function voicePool(L, g) {
+  const all = manifest.engines[L.engine].voices;
+  const pre = L.engine.startsWith('kokoro') ? (g === 'male' ? 'zm_' : 'zf_') : (g === 'male' ? 'M' : 'F');
+  const ids = all.filter(v => v.startsWith(pre));
+  return [L[g], ...ids.filter(v => v !== L[g])];
+}
+const voiceLabel = (id, L) => `${id.startsWith('zm_') || id.startsWith('M') ? 'Nam' : 'Nữ'} ${id.replace(/^z[mf]_/, '')}${id === L.male || id === L.female ? ' (chính)' : ''}`;
+const genderOf = (id) => (id.startsWith('zm_') || id.startsWith('M') ? 'male' : 'female');
+function speakerVoices(names) {
+  const L = cfg.languages[lang], map = (spkVoices[lang] ||= {});
+  const used = new Set(names.map(n => map[n]).filter(Boolean));
+  names.forEach((n, i) => {
+    if (map[n]) return;
+    const g = i % 2 === 0 ? 'female' : 'male';
+    map[n] = voicePool(L, g).find(v => !used.has(v)) || L[g];
+    used.add(map[n]);
+  });
+  return map;
+}
+function renderSpeakers() {
+  $('dlgMode').setAttribute('aria-pressed', dialogue);
+  $('speakers').hidden = !dialogue;
+  if (!dialogue) return;
+  const L = cfg.languages[lang];
+  const turns = parseDialogue(placeholder ? '' : text.value);
+  const names = [...new Set(turns.map(t => t.speaker || '(không tên)'))];
+  const list = $('spkList'); list.textContent = '';
+  if (!names.length) { list.innerHTML = '<div class="sub">Chưa có lượt thoại nào.</div>'; return; }
+  const map = speakerVoices(names);
+  for (const n of names) {
+    const row = document.createElement('div'); row.className = 'spk';
+    const who = document.createElement('div'); who.className = 'who'; who.textContent = n;
+    const k = turns.filter(t => (t.speaker || '(không tên)') === n).length;
+    const small = document.createElement('small'); small.textContent = `${k} lượt`; who.append(small);
+    const pills = document.createElement('div'); pills.className = 'pills';
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Giọng của ' + n);
+    const fill = (g) => { sel.textContent = ''; voicePool(L, g).forEach(v => sel.append(new Option(voiceLabel(v, L), v))); sel.value = map[n]; };
+    for (const [g, label] of [['female', 'Nữ'], ['male', 'Nam']]) {
+      const b = document.createElement('button'); b.className = 'pill'; b.textContent = label;
+      b.setAttribute('aria-pressed', genderOf(map[n]) === g);
+      b.onclick = () => { if (genderOf(map[n]) !== g) { map[n] = voicePool(L, g)[0]; renderSpeakers(); } };
+      pills.append(b);
+    }
+    fill(genderOf(map[n]));
+    sel.onchange = () => { map[n] = sel.value; };
+    row.append(who, pills, sel); list.append(row);
+  }
+}
+let spkTimer = null;
+text.addEventListener('input', () => { if (dialogue) { clearTimeout(spkTimer); spkTimer = setTimeout(renderSpeakers, 250); } });
+$('dlgMode').onclick = () => { dialogue = !dialogue; store.set('dialogue', dialogue ? '1' : '0'); renderSpeakers(); };
 
 // ---- job ---------------------------------------------------------------------------------------
 const bar = $('bar');
@@ -137,7 +206,15 @@ $('go').onclick = () => {
   const L = cfg.languages[lang];
   busy = true; animate(true);
   $('result').classList.remove('show'); setStatus('Đang chuẩn bị…'); progress(null); refresh();
-  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, voice: (L.choices || {})[gender] ? $('voice').value : L[gender], speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
+  const single = (L.choices || {})[gender] ? $('voice').value : L[gender];
+  let segments = [{ text: content, voice: single }];
+  if (dialogue) {
+    const turns = parseDialogue(content);
+    const map = speakerVoices([...new Set(turns.map(t => t.speaker || '(không tên)'))]);
+    segments = turns.map(t => ({ text: t.text, voice: map[t.speaker || '(không tên)'] }));
+  }
+  lastDialogue = dialogue && segments.length > 1;
+  worker.postMessage({ type: 'synthesize', engine: L.engine, lang, segments, speed: (cfg.speed[$('speed').value] || 1) * ((cfg.speed_scale || {})[lang] || 1),
                        steps: cfg.quality[$('quality').value] || 8, text: content,
                        commaBreak: (cfg.pause_at_comma || []).includes(lang), pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {})[lang] || {}) } });
 };
@@ -157,19 +234,40 @@ function wav(samples, sr) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 function filename() {
-  const words = (text.value.match(/[\p{L}\p{N}]+/gu) || []).slice(0, 5).join('-').slice(0, 40) || 'giong-noi';
+  const src = lastDialogue ? parseDialogue(text.value).map(t => t.text).join(' ') : text.value;
+  const words = (src.match(/[\p{L}\p{N}]+/gu) || []).slice(0, 5).join('-').slice(0, 40) || 'giong-noi';
   const L = cfg.languages[lang], who = (L.choices || {})[gender] ? $('voice').value : (gender === 'male' ? 'nam' : 'nu');
-  return `${lang}_${who}_${words}.wav`;
+  return `${lang}_${lastDialogue ? 'hoithoai' : who}_${words}`;
 }
 function showResult(samples, sr) {
   const blob = wav(samples, sr);
   if (lastUrl) URL.revokeObjectURL(lastUrl);
   lastUrl = URL.createObjectURL(blob);
   const secs = Math.round(samples.length / sr);
-  $('player').src = lastUrl; $('save').href = lastUrl; $('save').download = filename();
-  $('rname').textContent = filename();
-  $('rmeta').textContent = `WAV · ${(blob.size / 1e6).toFixed(1)} MB · ${clock(secs)}`;
+  const name = filename();
+  $('player').src = lastUrl; $('save').href = lastUrl; $('save').download = name + '.wav';
+  $('rname').textContent = name + '.mp3';
+  $('rmeta').textContent = `${clock(secs)} · WAV ${(blob.size / 1e6).toFixed(1)} MB`;
   $('result').classList.add('show'); $('playLabel').textContent = 'Nghe';
+  makeMp3(samples, sr, name, secs, blob.size);
+}
+// MP3 is encoded in its own worker after the WAV is ready, so listening is never delayed.
+function makeMp3(samples, sr, name, secs, wavBytes) {
+  if (mp3w) mp3w.terminate();
+  if (mp3Url) { URL.revokeObjectURL(mp3Url); mp3Url = null; }
+  const a = $('saveMp3'); a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true'); $('mp3Label').textContent = 'Đang tạo MP3…';
+  mp3w = new Worker(new URL('mp3worker.js', import.meta.url));
+  mp3w.onmessage = ({ data }) => {
+    if (data.type === 'progress') $('mp3Label').textContent = `Đang tạo MP3… ${Math.round(100 * data.done / data.total)}%`;
+    else if (data.type === 'done') {
+      mp3Url = URL.createObjectURL(data.blob);
+      a.href = mp3Url; a.download = name + '.mp3'; a.removeAttribute('aria-disabled'); $('mp3Label').textContent = 'Tải MP3';
+      $('rmeta').textContent = `${clock(secs)} · MP3 ${(data.blob.size / 1e6).toFixed(1)} MB · WAV ${(wavBytes / 1e6).toFixed(1)} MB`;
+      mp3w.terminate(); mp3w = null;
+    } else { $('mp3Label').textContent = 'Không tạo được MP3'; mp3w.terminate(); mp3w = null; }
+  };
+  mp3w.onerror = () => { $('mp3Label').textContent = 'Không tạo được MP3'; };
+  mp3w.postMessage({ samples, sampleRate: sr, kbps: 128 });
 }
 $('play').onclick = () => { const a = $('player'); if (a.paused) { a.currentTime = a.ended ? 0 : a.currentTime; a.play(); } else a.pause(); };
 $('player').onplay = () => ($('playLabel').textContent = 'Dừng');

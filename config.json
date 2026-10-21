@@ -67,7 +67,8 @@
   ],
   "pauses": {
     "sentence": 0.3,
-    "comma": 0.15
+    "comma": 0.15,
+    "turn": 0.6
   },
   "speed_scale": {
     "zh": 0.9

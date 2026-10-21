@@ -106,6 +106,19 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
 .eng { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
 .chip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); }
 .chip.ok { background: var(--good-bg); color: var(--good); }
+.btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+.speakers { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.speakers[hidden] { display: none; }
+.speakers .help { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+.speakers .help code { background: var(--field); border-radius: 6px; padding: 1px 6px; font-size: 13px; color: var(--ink); }
+.spk { display: grid; grid-template-columns: minmax(90px, 200px) auto minmax(140px, 220px); gap: 10px; align-items: center; padding: 6px 0; }
+.spk .who { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spk .who small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
+.spk .pill { height: 32px; min-width: 56px; padding: 0 12px; }
+.spk select { height: 34px; }
+.result .btn.main { background: var(--accent); color: #fff; }
+.result .btn.main:hover { background: var(--accent-hover); }
+.result .btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
 @media (max-width: 900px) {
   .settings { grid-template-columns: 1fr; gap: 14px; }
   .settings > div { padding: 0; border: 0 !important; }
@@ -119,6 +132,8 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   #status, .bar { grid-column: 1 / -1; }
   #go { grid-row: auto; grid-column: 1 / -1; min-width: 0; width: 100%; }
   #cancel:not([hidden]) ~ #go { grid-column: 1; }
+  .result { flex-wrap: wrap; } .result .grow { flex-basis: calc(100% - 140px); }
+  .spk { grid-template-columns: 1fr auto; } .spk select { grid-column: 1 / -1; }
   #cancel { grid-row: auto; grid-column: 2; order: 2; }
   .result { flex-wrap: wrap; }
   .result .btn { margin-left: auto; }
@@ -140,6 +155,7 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
@@ -189,12 +205,18 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   <section class="card">
     <div class="row">
       <div class="cap grow" style="margin:0"><svg class="i"><use href="#i-filetext"/></svg>VĂN BẢN</div>
+      <button class="btn" id="dlgMode" aria-pressed="false" title="Mỗi dòng bắt đầu bằng tên người nói, ví dụ  Anna: Hallo!"><svg class="i"><use href="#i-users"/></svg>Hội thoại</button>
       <button class="btn" id="open"><svg class="i"><use href="#i-folder"/></svg>Mở tệp .txt</button>
       <button class="btn" id="clear"><svg class="i"><use href="#i-trash"/></svg>Xoá chữ</button>
       <input type="file" id="file" accept=".txt,text/plain" hidden>
     </div>
     <textarea id="text" spellcheck="false" maxlength="100000" aria-label="Văn bản cần đọc"></textarea>
     <div class="count"><span id="kbd"></span><span id="count"></span></div>
+    <div class="speakers" id="speakers" hidden>
+      <div class="cap" style="margin-bottom:4px"><svg class="i"><use href="#i-users"/></svg>NGƯỜI NÓI</div>
+      <div class="help">Mỗi lượt thoại một dòng, bắt đầu bằng tên và dấu hai chấm, ví dụ <code>Anna: Guten Tag!</code>. Dòng không có tên được đọc tiếp bằng giọng của lượt trước. Tên không được đọc lên.</div>
+      <div id="spkList"></div>
+    </div>
   </section>
 
   <section class="card run">
@@ -206,7 +228,8 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
       <button class="play" id="play"><span class="b"><svg class="i"><use href="#i-play"/></svg></span><span id="playLabel">Nghe</span></button>
       <svg class="i"><use href="#i-file"/></svg>
       <div class="grow"><div class="name" id="rname"></div><div class="meta" id="rmeta"></div></div>
-      <a class="btn" id="save" download><svg class="i"><use href="#i-download"/></svg>Tải file WAV</a>
+      <a class="btn main" id="saveMp3" download><svg class="i"><use href="#i-download"/></svg><span id="mp3Label">Tải MP3</span></a>
+      <a class="btn" id="save" download>WAV</a>
     </div>
   </section>
 

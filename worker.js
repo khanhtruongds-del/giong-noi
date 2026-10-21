@@ -197,7 +197,7 @@ async function kkSynth(k, text, style, speed) {
 
 // ---- jobs -----------------------------------------------------------------------------------------
 // Kokoro pads every chunk with silence; trim it so the configured pauses alone set the rhythm.
-function trimSilence(x, sr, margin = 0.04) {
+function trimSilence(x, sr, margin = 0.04, head = true, tail = true) {
   let peak = 0; for (const v of x) peak = Math.max(peak, Math.abs(v));
   if (!peak) return x;
   const th = peak * 0.02, win = Math.round(sr * 0.01);
@@ -205,36 +205,49 @@ function trimSilence(x, sr, margin = 0.04) {
   let a = 0; while (a < x.length && !loud(a)) a += win;
   let b = x.length; while (b > a && !loud(Math.max(0, b - win))) b -= win;
   const m = Math.round(sr * margin);
-  return x.subarray(Math.max(0, a - m), Math.min(x.length, b + m));
+  return x.subarray(head ? Math.max(0, a - m) : 0, tail ? Math.min(x.length, b + m) : x.length);
 }
 
-async function synthesize({ engine, lang, voice, speed, steps, text, commaBreak = false, pauses = { sentence: 0.3, comma: 0.15 } }) {
+async function synthesize({ engine, lang, segments, voice, text, speed, steps, commaBreak = false, pauses = { sentence: 0.3, comma: 0.15, turn: 0.6 } }) {
   cancelled = false;
   const e = await ensureEngine(engine);
-  let chunks, style;
-  if (e.kind === 'supertonic') {
-    const bad = stUnsupported(e, text);
-    if (bad.length) throw new Error('Giọng này không đọc được các ký tự: ' + bad.join(' ') + '. Hãy xoá hoặc thay chúng rồi thử lại.');
-    chunks = sentenceChunks(text, lang === 'ko' ? 120 : 300, { group: false, commaBreak });
-    style = await stStyle(e, voice);
-  } else {
-    chunks = sentenceChunks(text, 120, { group: false, commaBreak }).flatMap(kkFit);
-    style = await kkStyle(e, voice);
+  if (!segments) segments = [{ text, voice }];
+  // Each segment is one speaker turn (or the whole text in single-voice mode).
+  const plan = [];
+  for (const seg of segments) {
+    let chunks;
+    if (e.kind === 'supertonic') {
+      const bad = stUnsupported(e, seg.text);
+      if (bad.length) throw new Error('Giọng này không đọc được các ký tự: ' + bad.join(' ') + '. Hãy xoá hoặc thay chúng rồi thử lại.');
+      chunks = sentenceChunks(seg.text, lang === 'ko' ? 120 : 300, { group: false, commaBreak });
+    } else chunks = sentenceChunks(seg.text, 120, { group: false, commaBreak }).flatMap(kkFit);
+    if (chunks.length) plan.push({ chunks, voice: seg.voice });
   }
-  if (!chunks.length) throw new Error('Không có đoạn văn bản hợp lệ.');
-  // A sentence gets the longer pause; a clause that was split at a comma gets the shorter one.
-  const pauseFor = (c) => new Float32Array(Math.round((/[、，,]$/.test(c.trim()) ? pauses.comma : pauses.sentence) * e.sr));
+  const total = plan.reduce((n, p) => n + p.chunks.length, 0);
+  if (!total) throw new Error('Không có đoạn văn bản hợp lệ.');
+  const silence = (s) => new Float32Array(Math.round(s * e.sr));
+  // A sentence gets the longer pause; a clause that was split at a comma gets the shorter one; a new speaker the longest.
+  const pauseFor = (c) => silence(/[、，,]$/.test(c.trim()) ? pauses.comma : pauses.sentence);
   const pieces = [];
-  for (let i = 0; i < chunks.length; i++) {
-    if (cancelled) throw new Error('cancelled');
-    post('progress', { done: i, total: chunks.length });
-    const wav = e.kind === 'supertonic' ? await stSynth(e, chunks[i], lang, style, steps, speed) : await kkSynth(e, chunks[i], style, speed);
-    pieces.push(e.kind === 'kokoro' ? trimSilence(wav, e.sr) : wav); if (i < chunks.length - 1) pieces.push(pauseFor(chunks[i]));
+  let done = 0;
+  for (let t = 0; t < plan.length; t++) {
+    const { chunks, voice } = plan[t];
+    const style = e.kind === 'supertonic' ? await stStyle(e, voice) : await kkStyle(e, voice);
+    for (let i = 0; i < chunks.length; i++) {
+      if (cancelled) throw new Error('cancelled');
+      post('progress', { done: done++, total });
+      const wav = e.kind === 'supertonic' ? await stSynth(e, chunks[i], lang, style, steps, speed) : await kkSynth(e, chunks[i], style, speed);
+      // Kokoro: always trim. Supertonic: keep its own sentence rhythm, trim only where one speaker hands over to the next.
+      const edge = plan.length > 1 && (i === 0 || i === chunks.length - 1);
+      pieces.push(e.kind === 'kokoro' ? trimSilence(wav, e.sr) : edge ? trimSilence(wav, e.sr, 0.04, i === 0 && t > 0, i === chunks.length - 1 && t < plan.length - 1) : wav);
+      if (i < chunks.length - 1) pieces.push(pauseFor(chunks[i]));
+    }
+    if (t < plan.length - 1) pieces.push(silence(pauses.turn ?? 0.6));
   }
   const n = pieces.reduce((a, p) => a + p.length, 0);
   const audio = new Float32Array(n);
   let off = 0; for (const p of pieces) { audio.set(p, off); off += p.length; }
-  post('done', { audio, sampleRate: e.sr, chunks: chunks.length }, );
+  post('done', { audio, sampleRate: e.sr, chunks: total });
 }
 
 self.onmessage = async ({ data }) => {
