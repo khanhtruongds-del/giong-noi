@@ -3,7 +3,7 @@
 // in the Cache API after the first download. Same message protocol as worker.js.
 import * as ort from './vendor/gpu/ort.webgpu.min.mjs';
 import { Tokenizer } from './vendor/tokenizers.min.mjs';
-import { QwenTTS, SAMPLE_RATE } from './qwen.js';
+import { QwenTTS, SAMPLE_RATE } from './qwen.js?v=20261022a';
 import { sentenceChunks } from './text.js';
 
 const BASE = new URL('./', import.meta.url).href;
@@ -15,7 +15,7 @@ ort.env.wasm.numThreads = 1;
 const LANG = { de: 'german', en: 'english', fr: 'french', zh: 'chinese', ja: 'japanese', ko: 'korean' };
 
 const EP = { cp: 'wasm', dec: 'webgpu' };   // measured on M4: cp wasm 87 ms/frame vs 400 ms on WebGPU; decoder faster on WebGPU
-let spec = null, tts = null, voices = null, cancelled = false;
+let spec = null, tts = null, voices = null, cancelled = false, getFile = null;
 const post = (type, data = {}) => self.postMessage({ type, ...data });
 const url = (f) => spec.base + f;
 
@@ -66,6 +66,7 @@ async function ensure() {
   const cache = await caches.open(CACHE);
   let got = 0; const onBytes = (n) => { got += n; if (!st.complete) post('download', { engine: 'qwen3', got, total: spec.bytes }); };
   const get = (f) => fetchFile(cache, f, onBytes);
+  getFile = (f) => fetchFile(cache, f, () => {});
   const dec = new TextDecoder(), json = async (f) => JSON.parse(dec.decode(await get(f)));
   const tok = new Tokenizer(await json('tokenizer.json'), await json('tokenizer_config.json'));
   voices = await json('voices.json');
@@ -96,15 +97,32 @@ const CJK = /[぀-ヿ㐀-鿿가-힯]/u;
 // Upper bound on frames for a chunk (12.5 frames per second), so a rare run-on generation stops instead of looping.
 const maxFrames = (t) => Math.min(900, 40 + Math.ceil([...t].reduce((n, c) => n + (CJK.test(c) ? 0.6 : /\s/.test(c) ? 0.05 : 0.17), 0) * 12.5 * 1.6));
 
+// Some graphics cards return NaN or an all-zero signal from the WebGPU decoder; such audio plays as silence.
+const silent = (x) => { let peak = 0; for (const v of x) { if (v !== v) return true; peak = Math.max(peak, Math.abs(v)); } return peak < 1e-3; };
+async function decodeChecked(q, frames) {
+  let wav = await q.decode(frames);
+  if (silent(wav) && EP.dec !== 'wasm') {          // retry once on the CPU and keep using it for this session
+    EP.dec = 'wasm';
+    post('status', { message: 'Đang chuyển phần giải mã âm thanh sang CPU…' });
+    q.dec = await ort.InferenceSession.create(await getFile('decoder_f32.onnx'), { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+    wav = await q.decode(frames);
+  }
+  for (let i = 0; i < wav.length; i++) if (wav[i] !== wav[i]) wav[i] = 0;
+  return wav;
+}
+
 async function speak(q, text, lang, voice) {
   const persona = voices[voice];
   if (!persona) throw new Error('Không tìm thấy giọng ' + voice + '.');
   const lim = maxFrames(text);
-  for (let attempt = 0; ; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     const frames = await q.generate(text, LANG[lang], persona, { maxFrames: lim });
     if (cancelled) throw new Error('cancelled');
-    if (frames.length < lim || attempt) return trimSilence(await q.decode(frames), SAMPLE_RATE);
+    if (frames.length < 3 || (frames.length >= lim && attempt === 0)) continue;   // empty or run-on take: generate again
+    const wav = await decodeChecked(q, frames);
+    if (!silent(wav)) return trimSilence(wav, SAMPLE_RATE);
   }
+  throw new Error('Máy này tạo ra âm thanh rỗng cho đoạn: “' + text.slice(0, 40) + '”. Hãy gửi cho nhóm phụ trách tên trình duyệt và loại máy đang dùng.');
 }
 
 async function synthesize({ lang, segments, voice, text, pauses = { sentence: 0.3, comma: 0.15, turn: 0.6 } }) {
