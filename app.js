@@ -1,5 +1,6 @@
 // UI: settings, text, job control, WAV export. Heavy work happens in worker.js.
-import * as SYL from './syllables.js?v=20261029a';
+import * as SYL from './syllables.js?v=20261029b';
+import { stretch } from './stretch.js?v=20261029b';
 const $ = (id) => document.getElementById(id);
 const cfg = await (await fetch('config.json', { cache: 'no-cache' })).json();
 const ORDER = ['de', 'en', 'fr', 'zh', 'ja', 'ko'];
@@ -16,6 +17,7 @@ let worker = null;
 let dialogue = store.get('dialogue') === '1';
 let sylMode = store.get('sylMode') === '1';   // Chinese syllable drill from pre-recorded clips (syllables.js), works without WebGPU
 let lastSyl = false, sylJob = 0, sylPending = null;
+let lastRaw = null;   // unstretched result: { audio, sr } or, for the drill, { items, gap, word } so speed can be changed afterwards
 const spkVoices = {};   // lang -> { speakerName: voiceId } chosen by the user this session
 
 // ---- header waveform ------------------------------------------------------------------------
@@ -52,7 +54,8 @@ $('quality').value = cfg.quality[store.get('quality')] ? store.get('quality') : 
 $('quality').onchange = () => store.set('quality', $('quality').value);
 for (const sp of Object.keys(cfg.speed)) $('speed').append(new Option(sp, sp));
 $('speed').value = cfg.speed[store.get('speed')] ? store.get('speed') : cfg.default_speed;
-$('speed').onchange = () => store.set('speed', $('speed').value);
+$('speed').onchange = () => { store.set('speed', $('speed').value); if (lastRaw && !busy) render(); };
+const rate = () => cfg.speed[$('speed').value] || 1;
 
 const mb = (b) => (b / 1e6).toFixed(0) + ' MB';
 function refresh() {
@@ -60,7 +63,7 @@ function refresh() {
   document.querySelectorAll('#genders .pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === gender));
   const L = cfg.languages[lang];
   $('qualityBox').hidden = true;
-  $('speedBox').hidden = true;   // Qwen speaks at its own natural pace; there is no speed control in the model
+  $('speedBox').hidden = false;   // applied after synthesis (stretch.js), so changing it re-times the last result instantly
   // Languages with a "choices" list (Chinese, while teachers pick) let the user try every voice of that gender.
   const pool = sylOn() ? null : (L.choices || {})[gender];   // the drill has one recorded voice per gender
   $('voiceBox').hidden = !pool;
@@ -209,8 +212,8 @@ const handlers = {
   download: (d) => { setStatus(`Đang tải dữ liệu giọng lần đầu · ${mb(d.got)} / ${mb(d.total)} (${Math.round(100 * d.got / d.total)}%)`); progress(d.got / d.total); },
   progress: (d) => { setStatus(d.total > 1 ? `Đang tạo giọng đọc… đoạn ${d.done + 1}/${d.total}` : 'Đang tạo giọng đọc…'); progress(d.total > 1 ? d.done / d.total : null); },
   done: (d) => {
-    if (sylPending) { const a = sylPending; sylPending = null; d = { audio: joinAudio(a.audio, d.audio, a.gap), sampleRate: d.sampleRate }; }
-    bar.hidden = true; showResult(d.audio, d.sampleRate); setStatus(`Đã xong · ${clock(d.audio.length / d.sampleRate)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); worker?.postMessage({ type: 'status' }); },
+    if (sylPending) { lastRaw = { ...sylPending, word: d.audio }; sylPending = null; } else lastRaw = { audio: d.audio, sr: d.sampleRate };
+    bar.hidden = true; const secs = render(); setStatus(`Đã xong · ${clock(secs)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); worker?.postMessage({ type: 'status' }); },
   error: (d) => { sylPending = null; finish(); bar.hidden = true; setStatus(d.message, true); },
   cancelled: () => { sylPending = null; finish(); bar.hidden = true; setStatus('Đã huỷ.'); },
   cache: (d) => { cache = { ...cache, ...d.engines }; refresh(); renderData(); },
@@ -244,6 +247,18 @@ $('cancel').onclick = () => {
 };
 
 // ---- syllable drill ----------------------------------------------------------------------------
+// Applies the chosen speed to the last raw result and shows it; returns its length in seconds.
+function render() {
+  const r = rate(), R = lastRaw;
+  let audio, sr;
+  if (R.items) {
+    sr = SYL.SAMPLE_RATE;
+    audio = SYL.build(R.items, R.gender, R.gap, (clip) => stretch(clip, r, sr));
+    if (R.word) audio = joinAudio(audio, stretch(R.word, r, sr), R.gap);
+  } else { sr = R.sr; audio = stretch(R.audio, r, sr); }
+  showResult(audio, sr);
+  return audio.length / sr;
+}
 function joinAudio(a, b, gap) {
   const pause = Math.round(gap * SYL.SAMPLE_RATE), out = new Float32Array(a.length + pause + b.length);
   out.set(a); out.set(b, a.length + pause);
@@ -256,18 +271,19 @@ async function runSyllables(content, qwenVoice) {
     if (job !== sylJob) return;
     if (!items.length) { finish(); bar.hidden = true; setStatus(unknown.length ? `Không có âm nào đọc được (${unknown.slice(0, 8).join(', ')}).` : 'Không tìm thấy chữ Hán hay pinyin để đọc.', true); return; }
     if (items.length > 400) { finish(); bar.hidden = true; setStatus(`Có ${items.length} âm, quá dài cho một lần đọc. Hãy chia nhỏ (tối đa 400 âm).`, true); return; }
-    const audio = await SYL.build(items, gender, gap, (n, total) => { setStatus(`Đang tải âm tiết… ${n}/${total}`); progress(n / total); }, () => job !== sylJob);
-    if (!audio || job !== sylJob) return;
+    const ok = await SYL.load(items, gender, (n, total) => { setStatus(`Đang tải âm tiết… ${n}/${total}`); progress(n / total); }, () => job !== sylJob);
+    if (!ok || job !== sylJob) return;
     const skipped = unknown.length ? ` Bỏ qua: ${unknown.slice(0, 8).join(', ')}${unknown.length > 8 ? '…' : ''}.` : '';
     const han = (content.match(/\p{Script=Han}+/gu) || []).join('，');
     if ($('sylWord').checked && han && GPU && worker) {
-      sylPending = { audio, gap };
+      sylPending = { items, gap, gender };
       setStatus('Đang đọc cả từ…' + skipped);
       worker.postMessage({ type: 'synthesize', engine: cfg.languages.zh.engine, lang: 'zh', segments: [{ text: han, voice: qwenVoice }], text: han, pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {}).zh || {}) } });
       return;
     }
-    bar.hidden = true; showResult(audio, SYL.SAMPLE_RATE);
-    setStatus(`Đã xong · ${items.length} âm · ${clock(audio.length / SYL.SAMPLE_RATE)}. Bấm “Nghe” hoặc tải file về.${skipped}`, !!skipped);
+    lastRaw = { items, gap, gender, word: null };
+    bar.hidden = true; const secs = render();
+    setStatus(`Đã xong · ${items.length} âm · ${clock(secs)}. Bấm “Nghe” hoặc tải file về.${skipped}`, !!skipped);
     finish();
   } catch (e) {
     if (job !== sylJob) return;

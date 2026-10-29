@@ -70,17 +70,28 @@ async function clip(voice, key) {
   return data;
 }
 
-// items → one Float32Array at 24 kHz: 0.3 s lead-in, clips separated by `gap` seconds. onProgress(done, total).
-export async function build(items, gender, gap, onProgress, cancelled) {
+// Fetch and decode every clip the items need (cached). onProgress(done, total); returns false if cancelled.
+export async function load(items, gender, onProgress, cancelled) {
   const { voices } = await loadIndex(), voice = voices[gender] || voices.female;
   const keys = [...new Set(items.map((x) => x.base + x.tone))];
   let done = 0;
   for (let i = 0; i < keys.length; i += 8) {
     await Promise.all(keys.slice(i, i + 8).map((k) => clip(voice, k).then(() => onProgress?.(++done, keys.length))));
-    if (cancelled?.()) return null;
+    if (cancelled?.()) return false;
   }
+  return true;
+}
+
+// Loaded items → one Float32Array at 24 kHz: 0.3 s lead-in, clips (each passed through `shape`, e.g. a speed change)
+// separated by `gap` seconds.
+export function build(items, gender, gap, shape = (c) => c) {
+  const voice = index.voices[gender] || index.voices.female, shaped = new Map();
+  const parts = items.map((x) => {
+    const k = x.base + x.tone;
+    if (!shaped.has(k)) shaped.set(k, shape(clips.get(`${voice}/${k}`)));
+    return shaped.get(k);
+  });
   const pause = Math.round(gap * SR), lead = Math.round(0.3 * SR);
-  const parts = items.map((x) => clips.get(`${voice}/${x.base}${x.tone}`));
   const out = new Float32Array(lead + parts.reduce((n, p) => n + p.length, 0) + pause * Math.max(0, parts.length - 1) + lead);
   let at = lead;
   parts.forEach((p, i) => { out.set(p, at); at += p.length + (i < parts.length - 1 ? pause : 0); });
