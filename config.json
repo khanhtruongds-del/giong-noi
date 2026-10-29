@@ -162,14 +162,14 @@
    "full": "Tiếng Trung (Quan thoại)",
    "engine": "qwen3",
    "male": "nam1",
-   "female": "nu1",
+   "female": "nu4",
    "sample": "早上好！你今天怎么样？",
    "choices": {
     "female": [
+     "nu4",
      "nu1",
      "nu2",
      "nu3",
-     "nu4",
      "nu5",
      "co",
      "bac_gai",
@@ -179,7 +179,6 @@
      "nam1",
      "nam2",
      "nam3",
-     "nam4",
      "nam5",
      "chu",
      "bac_trai",
@@ -188,10 +187,10 @@
    },
    "dialogue_voices": {
     "female": [
+     "nu4",
      "nu1",
      "nu2",
      "nu3",
-     "nu4",
      "nu5",
      "co",
      "bac_gai",
@@ -201,13 +200,13 @@
      "nam1",
      "nam2",
      "nam3",
-     "nam4",
      "nam5",
      "chu",
      "bac_trai",
      "ong"
     ]
-   }
+   },
+   "_khao_sat": "29/10 (Du, Quỳnh): Nữ 4 3,5 → mặc định nữ; Nam 1 4,5 giữ mặc định nam; ẩn Nam 4 (2,0: không giống người thật, nhấn quá mạnh, kéo dài âm)."
   },
   "ja": {
    "name": "Nhật",
