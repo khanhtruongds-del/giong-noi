@@ -129,24 +129,6 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   .settings > div { padding: 0; border: 0 !important; }
   .wave span { display: none; }
 }
-@media (max-width: 600px) {
-  .wrap { padding: 14px 16px; }
-  header { flex-wrap: wrap; } .mic { display: none; }
-  h1 { font-size: 24px; }
-  .run { grid-template-columns: 1fr auto; }
-  #status, .bar { grid-column: 1 / -1; }
-  #go { grid-row: auto; grid-column: 1 / -1; min-width: 0; width: 100%; }
-  #cancel:not([hidden]) ~ #go { grid-column: 1; }
-  .result { flex-wrap: wrap; } .result .grow { flex-basis: calc(100% - 140px); }
-  .spk { grid-template-columns: 1fr auto; } .spk select { grid-column: 1 / -1; }
-  #cancel { grid-row: auto; grid-column: 2; order: 2; }
-  .result { flex-wrap: wrap; }
-  .result .btn { margin-left: auto; }
-  #kbd { display: none; }
-  .cap { white-space: nowrap; }
-  .row .btn { padding: 0 10px; }
-  footer { align-items: flex-start; flex-wrap: wrap; }
-}
 </style>
 </head>
 <body>
