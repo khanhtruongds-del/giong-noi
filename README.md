@@ -9,3 +9,6 @@ Cần trình duyệt có WebGPU (Chrome, Edge bản mới trên máy tính).
 - `config.json` — giọng của từng tiếng (16 giọng: Nữ 1–5, Cô, Bác gái, Bà; Nam 1–5, Chú, Bác trai, Ông) và danh sách file model
 - `vendor/gpu/` — ONNX Runtime Web 1.30 (WebGPU); `vendor/tokenizers.min.mjs` — Hugging Face tokenizers.js
 - `licenses.html`, `LICENSES/` — giấy phép; giọng là giọng tổng hợp do máy tạo
+- `syllables.js`, `am-tiet/` — chế độ **Âm tiết** (tiếng Trung): đọc từng âm tiết bằng bản thu sẵn (Qwen3-TTS 1.7B, giọng Serena nữ / Aiden nam),
+  394 âm gốc × thanh = 1.121 file MP3 mỗi giọng (~5 KB/file, tải khi cần), không cần WebGPU. Chữ Hán → pinyin bằng `vendor/pinyin-pro.min.js` (MIT).
+  Cách tạo bảng âm: `tools/am-tiet/` (WAV → MP3: `to_mp3.py <thư mục WAV> am-tiet`).

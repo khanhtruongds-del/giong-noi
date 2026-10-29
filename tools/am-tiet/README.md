@@ -9,4 +9,5 @@ Chạy trên máy (không nằm trong trang web). 394 âm gốc × các thanh c�
 - `gop_ket_qua.py <đường dẫn ket-qua-full>`: gộp `ket-qua-redo` vào `ket-qua-full` (cất bản cũ vào `_cu/`, `scores.before-redo.json`).
 
 Kết quả 29/10/2026 (sau chạy lại): Serena 362/394 âm đúng hết thanh (1.086/1.121 thanh), Aiden 300/394 (1.021/1.121); đủ file cho cả 394 âm × 2 giọng.
-File âm thanh ở máy (qwen-am-tiet/ket-qua-full), chưa đưa vào repo.
+WAV gốc ở máy (qwen-am-tiet/ket-qua-full). Bản dùng trên trang: `to_mp3.py <ket-qua-full> ../../am-tiet` → `am-tiet/{serena,aiden}/{âm}{thanh}.mp3`
+(cân âm lượng RMS −20 dBFS, vuốt đầu/cuối 8 ms) + `am-tiet/index.json` (giọng theo giới, thanh có của từng âm).

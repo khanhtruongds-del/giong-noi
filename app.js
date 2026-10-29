@@ -1,4 +1,5 @@
 // UI: settings, text, job control, WAV export. Heavy work happens in worker.js.
+import * as SYL from './syllables.js?v=20261029a';
 const $ = (id) => document.getElementById(id);
 const cfg = await (await fetch('config.json', { cache: 'no-cache' })).json();
 const ORDER = ['de', 'en', 'fr', 'zh', 'ja', 'ko'];
@@ -13,8 +14,8 @@ let gender = store.get('gender') === 'male' ? 'male' : 'female';
 let placeholder = true, busy = false, cache = {}, lastUrl = null, mp3Url = null, lastDialogue = false, mp3w = null;
 let worker = null;
 let dialogue = store.get('dialogue') === '1';
-let sylMode = false;   // syllable drill was Kokoro-only; removed with the old engines
-let lastSyl = false;
+let sylMode = store.get('sylMode') === '1';   // Chinese syllable drill from pre-recorded clips (syllables.js), works without WebGPU
+let lastSyl = false, sylJob = 0, sylPending = null;
 const spkVoices = {};   // lang -> { speakerName: voiceId } chosen by the user this session
 
 // ---- header waveform ------------------------------------------------------------------------
@@ -61,7 +62,7 @@ function refresh() {
   $('qualityBox').hidden = true;
   $('speedBox').hidden = true;   // Qwen speaks at its own natural pace; there is no speed control in the model
   // Languages with a "choices" list (Chinese, while teachers pick) let the user try every voice of that gender.
-  const pool = (L.choices || {})[gender];
+  const pool = sylOn() ? null : (L.choices || {})[gender];   // the drill has one recorded voice per gender
   $('voiceBox').hidden = !pool;
   if (pool) {
     const sel = $('voice'), saved = store.get(`voice_${lang}_${gender}`);
@@ -74,7 +75,11 @@ function refresh() {
   const st = cache.qwen3;
   const hint = $('hint');
   const who = `${L.full} · giọng ${gender === 'male' ? 'nam' : 'nữ'}`;
-  if (st && st.complete) {
+  if (sylOn()) {
+    hint.className = 'hint ok';
+    $('hintIcon').innerHTML = '<use href="#i-check"/>';
+    $('hintText').textContent = `Bảng âm tiết thu sẵn · giọng ${gender === 'male' ? 'nam' : 'nữ'}. Mỗi âm tải khoảng 5 KB khi cần, không cần WebGPU.${GPU ? '' : ' “Đọc cả từ ở cuối” cần WebGPU nên sẽ bỏ qua.'}`;
+  } else if (st && st.complete) {
     hint.className = 'hint ok';
     $('hintIcon').innerHTML = '<use href="#i-check"/>';
     $('hintText').textContent = `${who} đã sẵn sàng, dùng được cả khi không có mạng.`;
@@ -85,13 +90,13 @@ function refresh() {
   }
   if (placeholder) setPlaceholder();
   renderSpeakers();
-  $('go').disabled = busy || !GPU;
+  $('go').disabled = busy || (!GPU && !sylOn());
   $('goLabel').textContent = busy ? 'Đang tạo…' : 'Tạo giọng đọc';
   $('cancel').hidden = !busy;
   if (!busy && !$('status').textContent) idle();
 }
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-function idle() { if (GPU) setStatus('Nhập văn bản rồi bấm “Tạo giọng đọc”.'); else setStatus(NO_GPU, true); }
+function idle() { if (GPU || sylOn()) setStatus('Nhập văn bản rồi bấm “Tạo giọng đọc”.'); else setStatus(NO_GPU, true); }
 $('kbd').innerHTML = `Mẹo: <kbd>${MAC ? '⌘' : 'Ctrl'}</kbd> + <kbd>Enter</kbd> để tạo nhanh`;
 
 // ---- text --------------------------------------------------------------------------------------
@@ -144,7 +149,7 @@ function speakerVoices(names) {
 }
 const sylOn = () => sylMode && lang === 'zh';
 function renderSpeakers() {
-  $('sylMode').hidden = true;
+  $('sylMode').hidden = lang !== 'zh';
   $('sylMode').setAttribute('aria-pressed', sylOn());
   $('sylOpts').hidden = !sylOn();
   $('dlgMode').setAttribute('aria-pressed', dialogue && !sylOn());
@@ -178,8 +183,8 @@ function renderSpeakers() {
 }
 let spkTimer = null;
 text.addEventListener('input', () => { if (dialogue) { clearTimeout(spkTimer); spkTimer = setTimeout(renderSpeakers, 250); } });
-$('dlgMode').onclick = () => { dialogue = !(dialogue && !sylOn()); if (dialogue) sylMode = false; store.set('dialogue', dialogue ? '1' : '0'); store.set('sylMode', sylMode ? '1' : '0'); renderSpeakers(); if (placeholder) setPlaceholder(); };
-$('sylMode').onclick = () => { sylMode = !sylOn(); if (sylMode) dialogue = false; store.set('sylMode', sylMode ? '1' : '0'); store.set('dialogue', dialogue ? '1' : '0'); renderSpeakers(); if (placeholder) setPlaceholder(); };
+$('dlgMode').onclick = () => { dialogue = !(dialogue && !sylOn()); if (dialogue) sylMode = false; store.set('dialogue', dialogue ? '1' : '0'); store.set('sylMode', sylMode ? '1' : '0'); refresh(); idle(); };
+$('sylMode').onclick = () => { sylMode = !sylOn(); if (sylMode) dialogue = false; store.set('sylMode', sylMode ? '1' : '0'); store.set('dialogue', dialogue ? '1' : '0'); refresh(); idle(); };
 for (const [id, key] of [['sylGap', 'sylGap'], ['sylWord', 'sylWord']]) {
   const el = $(id), v = store.get(key);
   if (v != null) { if (el.type === 'checkbox') el.checked = v === '1'; else el.value = v; }
@@ -203,9 +208,11 @@ const handlers = {
   status: (d) => setStatus(d.message),
   download: (d) => { setStatus(`Đang tải dữ liệu giọng lần đầu · ${mb(d.got)} / ${mb(d.total)} (${Math.round(100 * d.got / d.total)}%)`); progress(d.got / d.total); },
   progress: (d) => { setStatus(d.total > 1 ? `Đang tạo giọng đọc… đoạn ${d.done + 1}/${d.total}` : 'Đang tạo giọng đọc…'); progress(d.total > 1 ? d.done / d.total : null); },
-  done: (d) => { bar.hidden = true; showResult(d.audio, d.sampleRate); setStatus(`Đã xong · ${clock(d.audio.length / d.sampleRate)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); worker?.postMessage({ type: 'status' }); },
-  error: (d) => { finish(); bar.hidden = true; setStatus(d.message, true); },
-  cancelled: () => { finish(); bar.hidden = true; setStatus('Đã huỷ.'); },
+  done: (d) => {
+    if (sylPending) { const a = sylPending; sylPending = null; d = { audio: joinAudio(a.audio, d.audio, a.gap), sampleRate: d.sampleRate }; }
+    bar.hidden = true; showResult(d.audio, d.sampleRate); setStatus(`Đã xong · ${clock(d.audio.length / d.sampleRate)} âm thanh. Bấm “Nghe” hoặc tải file về.`); finish(); worker?.postMessage({ type: 'status' }); },
+  error: (d) => { sylPending = null; finish(); bar.hidden = true; setStatus(d.message, true); },
+  cancelled: () => { sylPending = null; finish(); bar.hidden = true; setStatus('Đã huỷ.'); },
   cache: (d) => { cache = { ...cache, ...d.engines }; refresh(); renderData(); },
   cleared: () => { $('dataMsg').textContent = 'Đã xoá dữ liệu giọng.'; worker?.postMessage({ type: 'status' }); },
 };
@@ -227,12 +234,46 @@ $('go').onclick = () => {
   }
   lastDialogue = dialogue && !sylOn() && segments.length > 1;
   lastSyl = sylOn();
+  if (lastSyl) return runSyllables(content, L[gender]);
   worker.postMessage({ type: 'synthesize', engine: L.engine, lang, segments, text: content, pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {})[lang] || {}) } });
 };
 $('cancel').onclick = () => {
   // Terminating is the only way to stop a running ONNX call; the next job starts a fresh worker (models stay cached on disk).
+  sylJob++; sylPending = null;
   worker?.terminate(); newWorker(); finish(); bar.hidden = true; setStatus('Đã huỷ.');
 };
+
+// ---- syllable drill ----------------------------------------------------------------------------
+function joinAudio(a, b, gap) {
+  const pause = Math.round(gap * SYL.SAMPLE_RATE), out = new Float32Array(a.length + pause + b.length);
+  out.set(a); out.set(b, a.length + pause);
+  return out;
+}
+async function runSyllables(content, qwenVoice) {
+  const job = ++sylJob, gap = +$('sylGap').value;
+  try {
+    const { items, unknown } = await SYL.parse(content);
+    if (job !== sylJob) return;
+    if (!items.length) { finish(); bar.hidden = true; setStatus(unknown.length ? `Không có âm nào đọc được (${unknown.slice(0, 8).join(', ')}).` : 'Không tìm thấy chữ Hán hay pinyin để đọc.', true); return; }
+    if (items.length > 400) { finish(); bar.hidden = true; setStatus(`Có ${items.length} âm, quá dài cho một lần đọc. Hãy chia nhỏ (tối đa 400 âm).`, true); return; }
+    const audio = await SYL.build(items, gender, gap, (n, total) => { setStatus(`Đang tải âm tiết… ${n}/${total}`); progress(n / total); }, () => job !== sylJob);
+    if (!audio || job !== sylJob) return;
+    const skipped = unknown.length ? ` Bỏ qua: ${unknown.slice(0, 8).join(', ')}${unknown.length > 8 ? '…' : ''}.` : '';
+    const han = (content.match(/\p{Script=Han}+/gu) || []).join('，');
+    if ($('sylWord').checked && han && GPU && worker) {
+      sylPending = { audio, gap };
+      setStatus('Đang đọc cả từ…' + skipped);
+      worker.postMessage({ type: 'synthesize', engine: cfg.languages.zh.engine, lang: 'zh', segments: [{ text: han, voice: qwenVoice }], text: han, pauses: { ...cfg.pauses, ...((cfg.pauses_by_lang || {}).zh || {}) } });
+      return;
+    }
+    bar.hidden = true; showResult(audio, SYL.SAMPLE_RATE);
+    setStatus(`Đã xong · ${items.length} âm · ${clock(audio.length / SYL.SAMPLE_RATE)}. Bấm “Nghe” hoặc tải file về.${skipped}`, !!skipped);
+    finish();
+  } catch (e) {
+    if (job !== sylJob) return;
+    finish(); bar.hidden = true; setStatus(e.message || String(e), true);
+  }
+}
 
 // ---- result / WAV ----------------------------------------------------------------------------
 function wav(samples, sr) {

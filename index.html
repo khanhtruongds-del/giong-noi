@@ -202,7 +202,7 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
     <div class="count"><span id="kbd"></span><span id="count"></span></div>
     <div class="speakers" id="sylOpts" hidden>
       <div class="cap" style="margin-bottom:4px"><svg class="i"><use href="#i-audio"/></svg>ĐỌC TỪNG ÂM TIẾT</div>
-      <div class="help">Gõ chữ Hán (<code>你好</code>) hoặc pinyin có số thanh (<code>ma1 ma2 ma3 ma4</code>, <code>ni3hao3</code>). Pinyin không có số thanh (<code>ma</code>) sẽ đọc đủ 4 thanh. Mỗi âm được đọc riêng, không biến điệu.</div>
+      <div class="help">Gõ chữ Hán (<code>你好</code>) hoặc pinyin có số thanh (<code>ma1 ma2 ma3 ma4</code>, <code>ni3hao3</code>) hay có dấu (<code>nǐ hǎo</code>). Pinyin không có số thanh (<code>ma</code>) sẽ đọc mọi thanh có của âm đó. Mỗi âm là bản thu sẵn, đọc riêng, không biến điệu; thanh nhẹ (<code>吗</code>, <code>的</code>) đọc bằng thanh đầu tiên có trong bảng.</div>
       <div class="sylrow">
         <label>Khoảng nghỉ <select id="sylGap"><option value="1">1 giây</option><option value="1.5">1,5 giây</option><option value="2" selected>2 giây</option><option value="3">3 giây</option></select></label>
         <label><input type="checkbox" id="sylWord" checked> Đọc cả từ ở cuối</label>
@@ -246,6 +246,6 @@ dialog h2 { margin: 0 0 4px; font-size: 20px; }
   </div>
 </dialog>
 <audio id="player" hidden></audio>
-<script type="module" src="app.js?v=20261022a"></script>
+<script type="module" src="app.js?v=20261029a"></script>
 </body>
 </html>
