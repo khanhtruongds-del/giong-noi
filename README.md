@@ -12,3 +12,6 @@ Cần trình duyệt có WebGPU (Chrome, Edge bản mới trên máy tính).
 - `syllables.js`, `am-tiet/` — chế độ **Âm tiết** (tiếng Trung): đọc từng âm tiết bằng bản thu sẵn (Qwen3-TTS 1.7B, giọng Serena nữ / Aiden nam),
   394 âm gốc × thanh = 1.121 file MP3 mỗi giọng (~5 KB/file, tải khi cần), không cần WebGPU. Chữ Hán → pinyin bằng `vendor/pinyin-pro.min.js` (MIT).
   Cách tạo bảng âm: `tools/am-tiet/` (WAV → MP3: `to_mp3.py <thư mục WAV> am-tiet`).
+- `hang-loat.html` — **đọc hàng loạt** `jobs.json` của PLS Classroom ra MP3 + `ket-qua.json` (zip), chạy tiếp được khi bị ngắt;
+  danh sách dài dùng notebook Kaggle `kaggle/doc-hang-loat.ipynb` hoặc `tools/doc-hang-loat/doc_hang_loat.py` (cùng model, chạy bằng
+  ONNX Runtime CUDA, nhanh hơn ~13 lần). Hướng dẫn, tốc độ đo được, giấy phép: `tools/doc-hang-loat/README.md`.

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đọc hàng loạt</title>
+<meta name="description" content="Đọc cả danh sách jobs.json thành MP3 ngay trong trình duyệt (WebGPU), tải về một file zip kèm ket-qua.json.">
+<script src="coi-serviceworker.min.js"></script>
+<style>
+:root { --accent:#e5283e; --bg:#f5f6f8; --card:#fff; --line:#e3e6eb; --ink:#111827; --muted:#6b7280; --warn:#c2410c; --good:#15803d; --track:#e5e7eb; color-scheme:light; }
+@media (prefers-color-scheme: dark) { :root { --accent:#f0384d; --bg:#0d131c; --card:#141b26; --line:#273041; --ink:#f1f5f9; --muted:#9aa4b2; --warn:#fb923c; --good:#4ade80; --track:#3a4352; color-scheme:dark; } }
+* { box-sizing:border-box; }
+html, body { margin:0; background:var(--bg); color:var(--ink); }
+body { font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif; }
+main { max-width:900px; margin:0 auto; padding:20px 16px 40px; }
+h1 { margin:0 0 4px; font-size:26px; }
+.muted { color:var(--muted); font-size:14px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 18px; margin:12px 0; }
+.row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+button, label.btn { font:inherit; border:0; border-radius:10px; padding:9px 16px; background:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
+button.sec { background:var(--track); color:var(--ink); }
+button:disabled { opacity:.5; cursor:default; }
+input[type=file] { display:none; }
+.bar { height:8px; background:var(--track); border-radius:4px; overflow:hidden; margin:10px 0 4px; }
+.bar > div { height:100%; width:0; background:var(--accent); transition:width .2s; }
+.err { color:var(--warn); }
+.ok { color:var(--good); }
+#log { max-height:340px; overflow:auto; font:13px/1.45 ui-monospace,Consolas,monospace; white-space:pre-wrap; word-break:break-all; }
+a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Đọc hàng loạt</h1>
+  <div class="muted">Nạp <code>jobs.json</code> (PLS Classroom xuất) → đọc từng việc bằng Qwen3-TTS trên card đồ hoạ (WebGPU) → tải <code>ket-qua.zip</code> (MP3 theo đường dẫn <code>file</code> + <code>ket-qua.json</code>).
+    Kết quả được giữ trong trình duyệt nên đóng trang / mất điện vẫn chạy tiếp được. Danh sách dài nên dùng notebook Kaggle (<code>kaggle/doc-hang-loat.ipynb</code>). <a href="./">← Trang đọc thường</a></div>
+
+  <div class="card">
+    <div class="row">
+      <label class="btn" for="file">Chọn jobs.json</label><input id="file" type="file" accept=".json,application/json">
+      <span id="info" class="muted">Chưa nạp danh sách.</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="start" disabled>Bắt đầu / chạy tiếp</button>
+      <button id="stop" class="sec" disabled>Dừng</button>
+      <button id="zip" class="sec" disabled>Tải ket-qua.zip</button>
+      <button id="reset" class="sec" disabled>Xoá kết quả đã lưu</button>
+      <label class="muted"><input id="redo" type="checkbox"> đọc lại cả việc lỗi</label>
+    </div>
+    <div class="bar"><div id="bar"></div></div>
+    <div id="status" class="muted"></div>
+  </div>
+
+  <div class="card"><div id="log" class="muted"></div></div>
+</main>
+<script type="module" src="hang-loat.js?v=20261108b"></script>
+</body>
+</html>

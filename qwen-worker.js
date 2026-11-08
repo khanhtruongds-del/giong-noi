@@ -42,7 +42,8 @@ async function fetchFile(cache, f, onBytes) {
   }
   let out = buf.subarray(0, off);
   if (chunks) { out = new Uint8Array(off); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; } }
-  await cache.put(u, new Response(out, { headers: { 'content-type': 'application/octet-stream' } }));
+  // Some browsers refuse very large cache entries (seen in embedded Chromium); keep going without caching, it is only re-downloaded next time.
+  try { await cache.put(u, new Response(out, { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) { console.warn('cache.put', f, e); }
   return out;
 }
 
