@@ -115,3 +115,14 @@ Mỗi lần đọc có lấy mẫu ngẫu nhiên nên hai bản không trùng t�
   notebook Kaggle gỡ `onnxruntime` trước khi cài và dừng ngay nếu không chạy được trên GPU.
 - Một số câu trong DATA APP có dạng `A : …\nB : …` (loại `cau`): nhãn “A”, “B” sẽ bị đọc thành tiếng. Nên để Classroom xuất những câu này
   thành `hoi-thoai` hoặc bỏ nhãn trước khi đọc.
+
+## Chất lượng (chat_luong.py)
+
+`doc_hang_loat.py` dùng `chat_luong.py` (notebook Kaggle tự chép kèm):
+- **Làm sạch chữ** trước khi đọc: bỏ ký hiệu từ điển (`der Opa, -s`, `+ Dat`, `(qn)`, `～`, `（＝…）`…).
+- **Đọc từng vế**, nghỉ ở dấu phẩy / hết câu theo **nhịp đo từ audio thật** của từng tiếng (bảng `NHIP`); từ chối bản "nói tràn" (dài bất thường).
+- **Hậu kỳ**: kéo chậm phần nói về tốc độ chuẩn của tiếng (WSOLA), −20 dBFS, đỉnh ≤ −1 dBFS, fade 10 ms, lặng đầu / cuối.
+- **Tự chấm bằng Whisper** (`faster-whisper` large-v3-turbo, CER theo đơn vị đọc: pinyin có thanh / kana / hangul / chữ cái): đọc tối đa `--so-ban` bản (mặc định 3) cho từ / câu, giữ bản nghe ra đúng nhất; tiếng Nhật bản cuối đọc bằng kana. `ket-qua.json` ghi `cer`, `nghe`, `ban`, `can_nghe` (mục nên nghe lại).
+- Tắt chấm: `--khong-cham` (nhanh, chỉ đọc 1 bản). Notebook: `SO_BAN`, `CHAM`, `KBPS` ở ô Tuỳ chỉnh.
+
+Đo (13/11/2026, 100 mục mỗi bộ): từ tiếng Trung đạt chặt 78% → 87%, từ tiếng Nhật 75% → 86%, câu tiếng Đức 99%.

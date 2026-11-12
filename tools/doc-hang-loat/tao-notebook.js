@@ -3,6 +3,7 @@
 const fs = require('fs'), path = require('path');
 const here = __dirname, root = path.join(here, '..', '..');
 const src = fs.readFileSync(path.join(here, 'doc_hang_loat.py'), 'utf8').replace(/\r\n/g, '\n');
+const srcCL = fs.readFileSync(path.join(here, 'chat_luong.py'), 'utf8').replace(/\r\n/g, '\n');   // làm sạch chữ, nhịp theo tiếng, hậu kỳ, chấm Whisper
 const lines = (s) => s.replace(/\r\n/g, '\n').split('\n').map((l, i, a) => (i < a.length - 1 ? l + '\n' : l)).filter((l, i, a) => !(i === a.length - 1 && l === ''));
 const md = (s) => ({ cell_type: 'markdown', metadata: {}, source: lines(s) });
 const code = (s) => ({ cell_type: 'code', metadata: {}, execution_count: null, outputs: [], source: lines(s) });
@@ -24,10 +25,15 @@ Chạy lại phần lỗi / chưa xong: gắn thêm **Output của phiên bản 
 GIOI_HAN = None      # số việc đầu tiên cần đọc (vd 20 để thử tốc độ); None = tất cả
 HET_GIO = 11.3       # dừng an toàn trước giới hạn 12 giờ của Kaggle; phần còn lại ghi "loi" để lần sau chạy tiếp
 OUT = '/kaggle/working/ket-qua'
-MODEL_DIR = '/tmp/qwen3-tts-web'   # ngoài /kaggle/working để model không lọt vào Output`),
-  code(`!pip uninstall -y -q onnxruntime   # bản CPU (nếu có sẵn) che mất bản GPU
-!pip install -q "onnxruntime-gpu[cuda,cudnn]" tokenizers lameenc
+MODEL_DIR = '/tmp/qwen3-tts-web'   # ngoài /kaggle/working để model không lọt vào Output
+SO_BAN = 3           # số bản đọc cho mỗi từ / câu; Whisper chọn bản nghe đúng nhất (1 = nhanh, không chấm)
+CHAM = True         # tự chấm bằng Whisper (faster-whisper large-v3-turbo); False = chỉ đọc
+KBPS = 128          # chất lượng mp3`),
+  code(`!pip install -q faster-whisper       # tự chấm; cài TRƯỚC vì nó kéo theo onnxruntime bản CPU
+!pip uninstall -y -q onnxruntime   # bản CPU che mất bản GPU
+!pip install -q --force-reinstall "onnxruntime-gpu[cuda,cudnn]" tokenizers lameenc
 !nvidia-smi --query-gpu=name,memory.total --format=csv`),
+  code('%%writefile /tmp/chat_luong.py\n' + srcCL),
   code('%%writefile /tmp/doc_hang_loat.py\n' + src),
   code(`import glob, os, shutil, sys
 sys.path.insert(0, '/tmp')
@@ -44,7 +50,7 @@ for kq in glob.glob('/kaggle/input/**/ket-qua/ket-qua.json', recursive=True):
     shutil.copytree(os.path.dirname(kq), OUT, dirs_exist_ok=True)
 
 dhl.download_model(MODEL_DIR)
-res = dhl.run(JOBS, OUT, MODEL_DIR, limit=GIOI_HAN, hours=HET_GIO, require_gpu=True)`),
+res = dhl.run(JOBS, OUT, MODEL_DIR, limit=GIOI_HAN, hours=HET_GIO, require_gpu=True, so_ban=SO_BAN, cham=CHAM, kbps=KBPS)`),
   code(`import json, shutil
 kq = json.load(open(OUT + '/ket-qua.json', encoding='utf-8'))['ket_qua']
 loi = [r for r in kq if r['trang_thai'] != 'xong']
