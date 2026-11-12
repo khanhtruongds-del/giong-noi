@@ -13,6 +13,10 @@ Notebook Kaggle (kaggle/doc-hang-loat.ipynb) được tạo từ file này bằn
 import argparse, glob, hashlib, json, os, re, sys, time, unicodedata
 from datetime import datetime, timezone
 import numpy as np
+try:
+    import chat_luong as CL                         # làm sạch chữ, tách vế, nhịp theo tiếng, hoàn thiện, chấm Whisper (13/11/2026)
+except ImportError:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import chat_luong as CL
 
 HF_BASE = 'https://huggingface.co/Khanhpls/qwen3-tts-web/resolve/main/'
 MODEL_FILES = ['tokenizer.json', 'tokenizer_config.json', 'voices.json', 'text.f16', 'codec.f32',
@@ -277,33 +281,37 @@ def speak(q, text, lang, voice, rng):
     persona = q.voices.get(voice)
     if persona is None: raise ValueError('Không tìm thấy giọng ' + voice)
     lim = max_frames(text)
-    for attempt in range(3):
+    for attempt in range(4):
         frames = q.generate(text, LANG[lang], persona, max_frames=lim, rng=rng)
-        if len(frames) < 3 or (len(frames) >= lim and attempt == 0):
-            continue                                       # rỗng hoặc đọc lan man: tạo lại
+        if len(frames) < 3 or len(frames) >= lim:
+            continue                                       # rỗng hoặc đọc lan man (chạm trần khung) – lần thử nào cũng loại
         wav = q.decode(frames)
         if not silent(wav): return trim_silence(wav)
-    raise RuntimeError('Tạo ra âm thanh rỗng cho đoạn: ' + text[:40])
+    raise RuntimeError('Không tạo được bản đọc đạt (rỗng / lan man) cho đoạn: ' + text[:40])
 
 
-def synthesize(q, lang, segments, rng):
-    pauses = {**PAUSES, **PAUSES_BY_LANG.get(lang, {})}
+def synthesize(q, lang, segments, rng, loai='cau', hoan_thien=True):
+    nh = CL.NHIP.get(lang) or dict(cau=PAUSES['sentence'], phay=PAUSES['comma'], doi_vai=PAUSES['turn'])
     limit = 60 if lang in ('zh', 'ja', 'ko') else 160
-    plan = [(sentence_chunks(t, limit), v) for t, v in segments]
-    plan = [p for p in plan if p[0]]
+    plan = []
+    for t, v in segments:
+        ve = [(c, k) for x, k in CL.tach_ve(t, lang) for c in (sentence_chunks(x, limit) or [])] if loai != 'tu' else [(t, None)]
+        if ve: plan.append((ve, v))
     if not plan: raise ValueError('Không có đoạn văn bản hợp lệ.')
     sil = lambda s: np.zeros(round(s * SAMPLE_RATE), np.float32)
     pieces = []
-    for ti, (chunks, voice) in enumerate(plan):
-        for i, c in enumerate(chunks):
+    for ti, (ve, voice) in enumerate(plan):
+        for i, (c, nghi) in enumerate(ve):
             pieces.append(speak(q, c, lang, voice, rng))
-            if i < len(chunks) - 1: pieces.append(sil(pauses['sentence']))
-        if ti < len(plan) - 1: pieces.append(sil(pauses['turn']))
-    return np.concatenate(pieces)
+            if i < len(ve) - 1: pieces.append(sil(nh['phay'] if nghi == 'phay' else nh['cau']))
+        if ti < len(plan) - 1: pieces.append(sil(nh['doi_vai']))
+    wav = np.concatenate(pieces)
+    return CL.hoan_thien(wav, lang, loai, ' '.join(t for t, _ in segments)) if hoan_thien else wav
 
 
-def job_segments(job):
-    lang = job.get('lang')
+def job_segments(job, kana=False):
+    lang, loai = job.get('lang'), job.get('loai')
+    clean = lambda t: CL.lam_sach(t, lang, 'cau' if loai == 'hoi-thoai' else loai, kana)
     if job.get('loai') == 'hoi-thoai' and job.get('lines'):
         vai = job.get('vai') or {}
         segs = []
@@ -312,7 +320,9 @@ def job_segments(job):
             t = clean(ln.get('text'))
             if t: segs.append((t, voice_code(label, lang)))
         return segs
-    return [(clean(job.get('text')), voice_code(job.get('giong') or ('Nữ 4' if lang == 'zh' else 'Nữ 1'), lang))]
+    t = job.get('text')
+    if kana and lang == 'ja' and job.get('reading') and re.search(r'[\u3400-\u9fff]', t or '') and re.fullmatch(r'[\u3040-\u30ff・ー\s]+', job['reading']): t = job['reading']
+    return [(clean(t), voice_code(job.get('giong') or ('Nữ 4' if lang == 'zh' else 'Nữ 1'), lang))]
 
 
 def job_label(job):
@@ -347,7 +357,7 @@ def load_previous(out_dir, extra=()):
     return prev
 
 
-def run(jobs_path, out_dir, model_dir=None, limit=None, hours=None, device='auto', prev_results=(), log=print, require_gpu=False):
+def run(jobs_path, out_dir, model_dir=None, limit=None, hours=None, device='auto', prev_results=(), log=print, require_gpu=False, so_ban=3, cham=True, kbps=128):
     t_start = time.time()
     with open(jobs_path, encoding='utf-8') as f:
         doc = json.load(f)
@@ -365,6 +375,12 @@ def run(jobs_path, out_dir, model_dir=None, limit=None, hours=None, device='auto
     t0 = time.time(); q = QwenONNX(model_dir, device); log(f'Nạp model {time.time() - t0:.1f} s trên {q.device}')
     if require_gpu and not q.gpu:
         raise RuntimeError('Không chạy được trên GPU. Kaggle: Settings → Accelerator = GPU T4 x2 / P100, rồi chạy lại.')
+    # TỰ CHẤM (Whisper): có faster-whisper thì đọc tối đa so_ban bản cho từ / câu, giữ bản Whisper nghe ra đúng nhất (dừng sớm khi đúng hẳn)
+    ch = None
+    if cham and so_ban > 1:
+        try: ch = CL.Cham(device='cuda' if q.gpu else 'cpu'); log('Tự chấm bằng Whisper: bật')
+        except Exception as e: log(f'Tự chấm bằng Whisper: tắt ({type(e).__name__}: {e}) – mỗi việc đọc 1 bản')
+    NGUONG = {'tu': 0.0, 'cau': 0.1}
 
     def save():
         out = {'model': MODEL_NAME, 'tao_luc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
@@ -380,12 +396,22 @@ def run(jobs_path, out_dir, model_dir=None, limit=None, hours=None, device='auto
             log(f'Hết giờ ({hours} h): dừng, {len(todo) - n} việc để lần sau'); break
         t1 = time.time()
         try:
-            seed = int(hashlib.sha1(j['id'].encode()).hexdigest()[:8], 16)   # cùng id → cùng kết quả khi chạy lại
-            wav = synthesize(q, j['lang'], job_segments(j), np.random.default_rng(seed))
-            to_mp3(wav, os.path.join(out_dir, j['file']))
+            tot, n_ban = None, (so_ban if ch and j.get('loai') in ('tu', 'cau') else 1)
+            for k in range(n_ban):
+                seed = int(hashlib.sha1((j['id'] + ('' if k == 0 else f'#{k}')).encode()).hexdigest()[:8], 16)   # bản 0 = như trước
+                kana = j.get('lang') == 'ja' and k == n_ban - 1 and k > 0                                         # bản cuối tiếng Nhật: đọc theo kana
+                segs = job_segments(j, kana)
+                wav = synthesize(q, j['lang'], segs, np.random.default_rng(seed), j.get('loai'))
+                if not ch or n_ban == 1: tot = (None, '', wav, k); break
+                cer, nghe = ch.cer(wav, segs[0][0], j['lang'])
+                if tot is None or cer < tot[0]: tot = (cer, nghe, wav, k)
+                if cer <= NGUONG.get(j.get('loai'), 0.1): break
+            cer, nghe, wav, k = tot
+            to_mp3(wav, os.path.join(out_dir, j['file']), kbps)
             dur = round(len(wav) / SAMPLE_RATE, 2)
             results[j['id']] = {'id': j['id'], 'trang_thai': 'xong', 'file': j['file'], 'giong': job_label(j), 'thoi_luong': dur,
                                 'giay_tao': round(time.time() - t1, 2)}
+            if cer is not None: results[j['id']].update(cer=cer, nghe=nghe, ban=k + 1, can_nghe=cer > NGUONG.get(j.get('loai'), 0.1))
             times.append(time.time() - t1)
             log(f'[{n + 1}/{len(todo)}] {j["loai"]:9s} {time.time() - t1:5.1f}s → {dur:5.2f}s âm thanh  {j["file"]}  {clean(j.get("text"))[:30]}')
         except Exception as e:
@@ -408,10 +434,13 @@ def main():
     ap.add_argument('--gioi-han', type=int, help='chỉ đọc N việc đầu (thử tốc độ)')
     ap.add_argument('--het-gio', type=float, help='dừng sau N giờ (Kaggle tối đa 12 h/phiên)')
     ap.add_argument('--cpu', action='store_true')
+    ap.add_argument('--so-ban', type=int, default=3, help='số bản đọc tối đa cho mỗi từ / câu khi có Whisper tự chấm (mặc định 3)')
+    ap.add_argument('--khong-cham', action='store_true', help='tắt tự chấm bằng Whisper (mỗi việc 1 bản như trước)')
+    ap.add_argument('--kbps', type=int, default=128)
     a = ap.parse_args()
     try: sys.stdout.reconfigure(encoding='utf-8')     # Windows: cửa sổ lệnh mặc định cp1252
     except Exception: pass
-    run(a.jobs, a.out, a.model, a.gioi_han, a.het_gio, 'cpu' if a.cpu else 'auto')
+    run(a.jobs, a.out, a.model, a.gioi_han, a.het_gio, 'cpu' if a.cpu else 'auto', so_ban=a.so_ban, cham=not a.khong_cham, kbps=a.kbps)
 
 
 if __name__ == '__main__':
